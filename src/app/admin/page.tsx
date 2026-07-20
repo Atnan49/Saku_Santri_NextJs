@@ -89,6 +89,44 @@ export default function AdminPage() {
     { id: '3', user: 'Admin', action: 'Menambahkan Siswa Baru: Siti Rahma', time: '2026-07-08 09:00:00' }
   ]);
 
+  // Kenaikan Kelas state
+  const [promoteFromKelasId, setPromoteFromKelasId] = useState('k-1');
+  const [promoteToKelasId, setPromoteToKelasId] = useState('k-2');
+
+  const handlePromoteClass = () => {
+    const fromKelasName = db.kelas.find(x => x.id === promoteFromKelasId)?.nama || '';
+    const toKelasName = promoteToKelasId === 'lulus' ? 'Lulus' : (db.kelas.find(x => x.id === promoteToKelasId)?.nama || '');
+
+    const studentsToPromote = db.siswa.filter(s => s.kelasId === promoteFromKelasId && s.status === 'aktif');
+    if (studentsToPromote.length === 0) {
+      alert(`Tidak ada siswa aktif di ${fromKelasName}.`);
+      return;
+    }
+
+    if (!confirm(`Promosikan ${studentsToPromote.length} siswa dari ${fromKelasName} ke ${toKelasName}?`)) {
+      return;
+    }
+
+    const updatedSiswa = db.siswa.map(s => {
+      if (s.kelasId === promoteFromKelasId && s.status === 'aktif') {
+        return {
+          ...s,
+          kelasId: promoteToKelasId === 'lulus' ? s.kelasId : promoteToKelasId,
+          status: promoteToKelasId === 'lulus' ? 'lulus' as const : s.status
+        };
+      }
+      return s;
+    });
+
+    setDb(prev => ({
+      ...prev,
+      siswa: updatedSiswa
+    }));
+
+    logAction(`Promosi Kenaikan Kelas: memindahkan siswa dari ${fromKelasName} ke ${toKelasName}`);
+    alert(`Berhasil mempromosikan ${studentsToPromote.length} siswa.`);
+  };
+
   useEffect(() => {
     setDb(getDatabaseState());
     setHasLoaded(true);
@@ -377,15 +415,21 @@ export default function AdminPage() {
       return p;
     });
 
-    const updatedTagihans = db.tagihan.map(t => {
-      if (t.id === pem.tagihanId) {
-        return { ...t, status: 'lunas' as const };
+    const t = db.tagihan.find(x => x.id === pem.tagihanId);
+    const approvedPaymentsSum = db.pembayaran
+      .filter(p => p.tagihanId === pem.tagihanId && p.status === 'approved' && p.id !== pemId)
+      .reduce((acc, p) => acc + p.nominalDibayar, 0) + pem.nominalDibayar;
+
+    const isLunas = t ? approvedPaymentsSum >= t.nominal : false;
+
+    const updatedTagihans = db.tagihan.map(tg => {
+      if (tg.id === pem.tagihanId) {
+        return { ...tg, status: (isLunas ? 'lunas' : 'belum_bayar') as any };
       }
-      return t;
+      return tg;
     });
 
-    const t = db.tagihan.find(x => x.id === pem.tagihanId);
-    const sis = db.siswa.find(x => x.id === t?.siswaId);
+     const sis = db.siswa.find(x => x.id === t?.siswaId);
     const jt = db.jenisTagihan.find(x => x.id === t?.jenisTagihanId);
     const waliRel = db.waliSiswa.filter(ws => ws.siswaId === t?.siswaId);
     const newNotifs: Notifikasi[] = [];
@@ -395,7 +439,7 @@ export default function AdminPage() {
         id: 'n-' + Math.random().toString(36).substring(2, 9),
         waliId: wr.waliId,
         tipe: 'konfirmasi_diterima',
-        pesan: `[Saku Santri] Pembayaran tagihan ${jt?.nama} anak Anda *${sis?.nama}* sebesar *${formatRupiah(pem.nominalDibayar)}* TERVERIFIKASI & LUNAS.`,
+        pesan: `[Saku Santri] Pembayaran tagihan ${jt?.nama} anak Anda *${sis?.nama}* sebesar *${formatRupiah(pem.nominalDibayar)}* TERVERIFIKASI. Status tagihan: *${isLunas ? 'LUNAS' : 'SEBAGIAN (BELUM LUNAS)'}*.`,
         statusKirim: 'sent',
         createdAt: new Date().toISOString().replace('T', ' ').substring(0, 19)
       });
@@ -721,6 +765,52 @@ export default function AdminPage() {
                       </button>
                       <button className="apple-btn" onClick={() => setIsRelasiModalOpen(true)}>
                         Hubungkan Relasi
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Kenaikan Kelas Panel */}
+                  <div style={{
+                    backgroundColor: 'var(--system-gray-6)',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: '12px',
+                    padding: '12px 16px',
+                    display: 'flex',
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    flexWrap: 'wrap',
+                    gap: '12px',
+                    margin: '10px 0'
+                  }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                      <span style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--text-primary)' }}>Promosi Kenaikan Kelas Massal</span>
+                      <span style={{ fontSize: '10px', color: 'var(--text-tertiary)' }}>Naikkan tingkat kelas seluruh siswa aktif secara kolektif</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Dari Kelas:</span>
+                        <select value={promoteFromKelasId} onChange={(e) => setPromoteFromKelasId(e.target.value)} className="apple-input" style={{ width: '100px', padding: '4px' }}>
+                          {db.kelas.map(k => (
+                            <option key={k.id} value={k.id}>{k.nama}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', fontWeight: 'bold' }}>➔</div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Ke Kelas:</span>
+                        <select value={promoteToKelasId} onChange={(e) => setPromoteToKelasId(e.target.value)} className="apple-input" style={{ width: '110px', padding: '4px' }}>
+                          {db.kelas.map(k => (
+                            <option key={k.id} value={k.id}>{k.nama}</option>
+                          ))}
+                          <option value="lulus">Lulus / Alumni</option>
+                        </select>
+                      </div>
+
+                      <button onClick={handlePromoteClass} className="apple-btn" style={{ padding: '6px 12px', fontWeight: '600', backgroundColor: 'var(--system-blue-light)', color: 'var(--system-blue)', borderColor: 'var(--system-blue)' }}>
+                        Proses Kenaikan
                       </button>
                     </div>
                   </div>

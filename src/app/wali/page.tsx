@@ -259,35 +259,73 @@ export default function WaliPage() {
                 
                 {db.tagihan.filter(t => t.siswaId === activeSiswaId).map(tag => {
                   const jt = db.jenisTagihan.find(x => x.id === tag.jenisTagihanId);
-                  const payment = db.pembayaran.filter(p => p.tagihanId === tag.id).reverse()[0];
+                  
+                  // Calculate total approved payment for this bill
+                  const approvedPaymentsSum = db.pembayaran
+                    .filter(p => p.tagihanId === tag.id && p.status === 'approved')
+                    .reduce((acc, p) => acc + p.nominalDibayar, 0);
+
+                  // Calculate pending payment sum
+                  const pendingPaymentsSum = db.pembayaran
+                    .filter(p => p.tagihanId === tag.id && p.status === 'pending')
+                    .reduce((acc, p) => acc + p.nominalDibayar, 0);
+
+                  const sisaTagihan = Math.max(0, tag.nominal - approvedPaymentsSum);
+                  const isFullyPaid = sisaTagihan <= 0;
+
                   return (
                     <div key={tag.id} className="ios-widget flex-row-between" style={{ padding: '12px' }}>
-                      <div>
+                      <div style={{ flex: 1 }}>
                         <h4 style={{ fontSize: '12px', fontWeight: 'bold' }}>{jt?.nama}</h4>
                         <p style={{ fontSize: '10px', color: 'var(--text-tertiary)', marginTop: '2px' }}>Periode: {tag.periode} | Tempo: {tag.jatuhTempo}</p>
-                        <p style={{ fontSize: '12px', fontWeight: 'bold', marginTop: '4px' }}>{formatRupiah(tag.nominal)}</p>
+                        
+                        <div style={{ marginTop: '6px', fontSize: '11px' }}>
+                          <p style={{ color: 'var(--text-secondary)' }}>Total: <span style={{ fontWeight: 600 }}>{formatRupiah(tag.nominal)}</span></p>
+                          {approvedPaymentsSum > 0 && (
+                            <p style={{ color: 'var(--system-green)' }}>Terbayar: <span style={{ fontWeight: 600 }}>{formatRupiah(approvedPaymentsSum)}</span></p>
+                          )}
+                          {sisaTagihan > 0 && sisaTagihan < tag.nominal && (
+                            <p style={{ color: 'var(--system-orange)', fontWeight: 600 }}>Sisa: {formatRupiah(sisaTagihan)}</p>
+                          )}
+                        </div>
                       </div>
                       
-                      <div style={{ textAlign: 'right' }}>
-                        {tag.status === 'belum_bayar' && (
-                          <button onClick={() => { setUploadTagihanId(tag.id); setUploadNominal(tag.nominal); setUploadSuccessMsg(''); }} className="apple-btn apple-btn-primary" style={{ padding: '4px 10px', borderRadius: '12px', fontSize: '11px' }}>Bayar</button>
-                        )}
-                        {tag.status === 'menunggu_verifikasi' && (
-                          <span className="badge badge-warning">Verifikasi</span>
-                        )}
-                        {tag.status === 'terlambat' && (
-                          <div className="flex-column-gap" style={{ alignItems: 'flex-end', gap: '4px' }}>
-                            <span className="badge badge-danger">Terlambat</span>
-                            <button onClick={() => { setUploadTagihanId(tag.id); setUploadNominal(tag.nominal); setUploadSuccessMsg(''); }} className="apple-btn" style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '10px', color: 'var(--system-blue)' }}>Bayar</button>
-                          </div>
-                        )}
-                        {tag.status === 'lunas' && (
-                          <div className="flex-column-gap" style={{ alignItems: 'flex-end', gap: '4px' }}>
+                      <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+                        {isFullyPaid ? (
+                          <>
                             <span className="badge badge-success">Lunas</span>
-                            {payment?.status === 'approved' && (
-                              <button onClick={() => setActiveReceiptPayment(payment)} style={{ border: 'none', background: 'transparent', color: 'var(--system-blue)', fontSize: '11px', cursor: 'pointer', fontWeight: 'bold' }}>Slip</button>
+                            {db.pembayaran.filter(p => p.tagihanId === tag.id && p.status === 'approved').length > 0 && (
+                              <button 
+                                onClick={() => {
+                                  const lastApproved = db.pembayaran.filter(p => p.tagihanId === tag.id && p.status === 'approved').reverse()[0];
+                                  if (lastApproved) setActiveReceiptPayment(lastApproved);
+                                }} 
+                                style={{ border: 'none', background: 'transparent', color: 'var(--system-blue)', fontSize: '11px', cursor: 'pointer', fontWeight: 'bold' }}
+                              >
+                                Kwitansi
+                              </button>
                             )}
-                          </div>
+                          </>
+                        ) : (
+                          <>
+                            {tag.status === 'menunggu_verifikasi' || pendingPaymentsSum > 0 ? (
+                              <span className="badge badge-warning" style={{ marginBottom: '4px' }}>Verifikasi</span>
+                            ) : tag.status === 'terlambat' ? (
+                              <span className="badge badge-danger" style={{ marginBottom: '4px' }}>Terlambat</span>
+                            ) : null}
+                            
+                            <button 
+                              onClick={() => { 
+                                setUploadTagihanId(tag.id); 
+                                setUploadNominal(sisaTagihan); 
+                                setUploadSuccessMsg(''); 
+                              }} 
+                              className="apple-btn apple-btn-primary" 
+                              style={{ padding: '4px 10px', borderRadius: '12px', fontSize: '11px' }}
+                            >
+                              {approvedPaymentsSum > 0 ? 'Cicil Lagi' : 'Bayar'}
+                            </button>
+                          </>
                         )}
                       </div>
                     </div>
