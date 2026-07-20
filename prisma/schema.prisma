@@ -1,0 +1,107 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Siswa {
+  id             String       @id @default(cuid())
+  nis            String       @unique
+  nama           String
+  kelasId        String
+  kelas          Kelas        @relation(fields: [kelasId], references: [id])
+  status         String       // "aktif", "lulus", "pindah"
+  diskonPersen   Int          @default(0)
+  diskonNominal  Int          @default(0)
+  walis          WaliSiswa[]
+  tagihans       Tagihan[]
+  createdAt      DateTime     @default(now())
+}
+
+model Wali {
+  id           String       @id @default(cuid())
+  nama         String
+  noHp         String       @unique
+  email        String?      @unique
+  passwordHash String
+  siswas       WaliSiswa[]
+  notifikasis  Notifikasi[]
+  createdAt    DateTime     @default(now())
+}
+
+model WaliSiswa {
+  waliId    String
+  siswaId   String
+  relasi    String      // "Ayah", "Ibu", etc.
+  wali      Wali        @relation(fields: [waliId], references: [id], onDelete: Cascade)
+  siswa     Siswa       @relation(fields: [siswaId], references: [id], onDelete: Cascade)
+
+  @@id([waliId, siswaId])
+}
+
+model Kelas {
+  id            String       @id @default(cuid())
+  nama          String
+  jenjang       String       // "TK", "SD", "SMP", "SMA"
+  siswas        Siswa[]
+  tarifKelas    TarifKelas[]
+}
+
+model JenisTagihan {
+  id             String       @id @default(cuid())
+  nama           String
+  tipe           String       // "bulanan", "tahunan", "insidental"
+  nominalDefault Int
+  tarifKelas     TarifKelas[]
+  tagihans       Tagihan[]
+}
+
+model TarifKelas {
+  jenisTagihanId String
+  kelasId        String
+  nominal        Int
+  jenisTagihan   JenisTagihan @relation(fields: [jenisTagihanId], references: [id], onDelete: Cascade)
+  kelas          Kelas        @relation(fields: [kelasId], references: [id], onDelete: Cascade)
+
+  @@id([jenisTagihanId, kelasId])
+}
+
+model Tagihan {
+  id             String       @id @default(cuid())
+  siswaId        String
+  siswa          Siswa        @relation(fields: [siswaId], references: [id], onDelete: Cascade)
+  jenisTagihanId String
+  jenisTagihan   JenisTagihan @relation(fields: [jenisTagihanId], references: [id])
+  periode        String       // e.g. "2026-07"
+  nominal        Int
+  status         String       // "belum_bayar", "menunggu_verifikasi", "lunas", "terlambat"
+  jatuhTempo     DateTime
+  pembayarans    Pembayaran[]
+  createdAt      DateTime     @default(now())
+}
+
+model Pembayaran {
+  id              String    @id @default(cuid())
+  tagihanId       String
+  tagihan         Tagihan   @relation(fields: [tagihanId], references: [id], onDelete: Cascade)
+  nominalDibayar  Int
+  buktiUrl        String    // Link to storage file
+  tanggalTransfer DateTime
+  status          String    // "pending", "approved", "rejected"
+  catatanAdmin    String?
+  verifiedBy      String?
+  verifiedAt      DateTime?
+}
+
+model Notifikasi {
+  id         String   @id @default(cuid())
+  waliId     String
+  wali       Wali     @relation(fields: [waliId], references: [id], onDelete: Cascade)
+  tipe       String   // "tagihan_baru", "reminder", "konfirmasi"
+  pesan      String
+  statusKirim String  // "sent", "failed"
+  createdAt  DateTime @default(now())
+}
