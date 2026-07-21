@@ -22,6 +22,7 @@ Atnan bertanggung jawab atas logika bisnis, autentikasi, integrasi API, pengungg
   * [lib/whatsapp.ts](file:///d:/Projek-web/Saku%20santri/lib/whatsapp.ts) — Integrasi API Fonnte/Wablas untuk notifikasi status bayar & reminder.
   * [lib/blob.ts](file:///d:/Projek-web/Saku%20santri/lib/blob.ts) — Pengaturan helper upload bukti bayar menggunakan Vercel Blob.
   * [lib/utils.ts](file:///d:/Projek-web/Saku%20santri/lib/utils.ts) — Implementasi fungsi pembantu seperti format mata uang Rupiah (`formatIDR`) dan tanggal Indonesia.
+  * [middleware.ts](file:///d:/Projek-web/Saku%20santri/middleware.ts) — Filter rute halaman berbasis peran (Role-Based Access Control) untuk pengamanan halaman.
 * **API Endpoints:**
   * [app/api/auth/[...nextauth]/route.ts](file:///d:/Projek-web/Saku%20santri/app/api/auth/%5B...nextauth%5D/route.ts) — Router endpoint untuk alur autentikasi.
   * [app/api/tagihan/route.ts](file:///d:/Projek-web/Saku%20santri/app/api/tagihan/route.ts) — Endpoint pembuat tagihan siswa bulanan secara otomatis.
@@ -85,3 +86,12 @@ Usva bertanggung jawab atas visualisasi antarmuka, pembuatan reusable UI compone
     * [app/(dashboard)/bendahara/dashboard/page.tsx](file:///d:/Projek-web/Saku%20santri/app/%28dashboard%29/bendahara/dashboard/page.tsx) — Dashboard ringkasan keuangan total.
     * [app/(dashboard)/bendahara/approval/page.tsx](file:///d:/Projek-web/Saku%20santri/app/%28dashboard%29/bendahara/approval/page.tsx) — Antrean approval pembayaran final Tahap 2.
     * [app/(dashboard)/bendahara/laporan/page.tsx](file:///d:/Projek-web/Saku%20santri/app/%28dashboard%29/bendahara/laporan/page.tsx) — Form filter tanggal/kelas untuk ekspor laporan.
+
+---
+
+## 4. Berkas Konfigurasi Bersama (Atnan, Yafi, Usva)
+Berkas konfigurasi sistem yang harus dipahami oleh seluruh anggota tim:
+* [package.json](file:///d:/Projek-web/Saku%20santri/package.json) — Berisi daftar package dependency utama (Prisma, NextAuth, Vercel Blob, Recharts) dan scripts pemicu dev, build, & seed.
+* [tsconfig.json](file:///d:/Projek-web/Saku%20santri/tsconfig.json) — Pengaturan TypeScript agar struktur build Next.js konsisten.
+* [next.config.mjs](file:///d:/Projek-web/Saku%20santri/next.config.mjs) — Pengaturan environment Next.js dan whitelisting host gambar Vercel Blob.
+
