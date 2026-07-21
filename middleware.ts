@@ -1,11 +1,8 @@
 // =========================================================================
 // TANGGUNG JAWAB: Atnan (Backend & Security Middleware)
 // Deskripsi: Middleware NextAuth untuk melakukan proteksi rute halaman
-//            berbasis peran (Role-Based Access Control).
-//            Atnan bertanggung jawab mengelola aturan akses di sini:
-//            - Rute /admin/: hanya untuk role ADMIN
-//            - Rute /bendahara/: hanya untuk role BENDAHARA
-//            - Rute /wali/: hanya untuk role WALIMURID
+//            berbasis peran (Role-Based Access Control) secara fungsional.
+//            Atnan bertanggung jawab menguji dan menyesuaikan alur akses ini.
 // =========================================================================
 
 import { withAuth } from "next-auth/middleware";
@@ -16,27 +13,33 @@ export default withAuth(
     const token = req.nextauth.token;
     const path = req.nextUrl.pathname;
 
-    // TODO (Atnan): Sesuaikan aturan validasi token.role dengan path tujuan.
-    /*
+    // Proteksi Rute Admin
     if (path.startsWith("/admin") && token?.role !== "ADMIN") {
-      return NextResponse.redirect(new URL("/login", req.url));
+      return NextResponse.redirect(new URL("/login?error=UnauthorizedAdmin", req.url));
     }
+    
+    // Proteksi Rute Bendahara
     if (path.startsWith("/bendahara") && token?.role !== "BENDAHARA") {
-      return NextResponse.redirect(new URL("/login", req.url));
+      return NextResponse.redirect(new URL("/login?error=UnauthorizedBendahara", req.url));
     }
+    
+    // Proteksi Rute Wali Murid
     if (path.startsWith("/wali") && token?.role !== "WALIMURID") {
-      return NextResponse.redirect(new URL("/login", req.url));
+      return NextResponse.redirect(new URL("/login?error=UnauthorizedWali", req.url));
     }
-    */
   },
   {
     callbacks: {
-      authorized: ({ token }) => !!token, // Memastikan user sudah login
+      authorized: ({ token }) => !!token, // Mengizinkan middleware berjalan hanya jika user terautentikasi
     },
   }
 );
 
-// Tentukan rute mana saja yang akan diproteksi oleh middleware ini
+// Rute yang diawasi oleh middleware
 export const config = {
-  matcher: ["/admin/:path*", "/bendahara/:path*", "/wali/:path*"],
+  matcher: [
+    "/admin/:path*",
+    "/bendahara/:path*",
+    "/wali/:path*",
+  ],
 };

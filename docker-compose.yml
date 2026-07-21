@@ -1,0 +1,26 @@
+# =========================================================================
+# TANGGUNG JAWAB: Yafi (Database & Environment Setup)
+# Deskripsi: Berkas Docker Compose untuk inisialisasi kontainer basis data
+#            PostgreSQL secara instan di lingkungan lokal.
+# Cara menjalankan: docker compose up -d
+# =========================================================================
+
+version: '3.8'
+
+services:
+  sakusantri-postgres:
+    image: postgres:15-alpine
+    container_name: sakusantri_postgres_dev
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: sakusantri_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
+    driver: local
