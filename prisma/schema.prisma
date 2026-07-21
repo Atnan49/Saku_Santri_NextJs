@@ -1,142 +1,80 @@
-// =========================================================================
+// ===================================================================================
 // TANGGUNG JAWAB: Yafi (Database & Data Modeling)
-// Deskripsi: File ini berisi konfigurasi skema basis data PostgreSQL/SQLite
-//            menggunakan Prisma ORM. Yafi bertanggung jawab atas pembuatan
-//            relasi tabel, migrasi basis data, dan optimasi performa query.
-// =========================================================================
+// Deskripsi: Berkas cetak biru kebutuhan basis data untuk aplikasi Saku Santri.
+//            Yafi bertanggung jawab menuliskan skema Prisma nyata di sini
+//            dan melakukan migrasi basis data.
+// 
+// *Catatan: Skema lengkap yang siap pakai disimpan di berkas:
+//  .agent/implementation_plan.md
+// ===================================================================================
 
-datasource db {
-  provider = "postgresql" // Yafi dapat mengganti ke "sqlite" untuk local development
-  url      = env("DATABASE_URL")
-}
-
-generator client {
-  provider = "prisma-client-js"
-}
-
-enum Role {
-  ADMIN
-  WALIMURID
-  BENDAHARA
-}
-
-enum BillStatus {
-  BELUM_BAYAR
-  MENUNGGU_VERIFIKASI_ADMIN
-  MENUNGGU_APPROVAL_BENDAHARA
-  LUNAS
-  DITOLAK_ADMIN
-  DITOLAK_BENDAHARA
-}
-
-enum BillType {
-  BULANAN
-  TAHUNAN
-}
-
-model User {
-  id           String        @id @default(uuid())
-  username     String        @unique // No HP untuk Wali, Username/Email untuk Admin/Bendahara
-  phone        String?       @unique // Digunakan untuk login Wali Murid & notifikasi WA
-  email        String?       @unique
-  passwordHash String
-  name         String
-  role         Role          @default(WALIMURID)
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  waliProfile  WaliMurid?
-  notifications Notification[]
-}
-
-model WaliMurid {
-  id        String   @id @default(uuid())
-  userId    String   @unique
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  alamat    String?
-  students  Siswa[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model Kelas {
-  id        String   @id @default(uuid())
-  name      String   @unique // Misal "7A", "8B"
-  students  Siswa[]
-  createdAt DateTime @default(now())
-}
-
-model TahunAjaran {
-  id        String    @id @default(uuid())
-  year      String    @unique // Misal "2025/2026"
-  isActive  Boolean   @default(false)
-  bills     Tagihan[]
-  createdAt DateTime  @default(now())
-}
-
-model Siswa {
-  id             String    @id @default(uuid())
-  nisn           String    @unique
-  name           String
-  kelasId        String
-  kelas          Kelas     @relation(fields: [kelasId], references: [id])
-  waliId         String
-  wali           WaliMurid @relation(fields: [waliId], references: [id])
-  potonganTetap  Decimal   @default(0) // Nominal potongan khusus/beasiswa per bulan (jika ada)
-  catatanBeasiswa String?
-  bills          Tagihan[]
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-}
-
-model JenisTagihan {
-  id        String    @id @default(uuid())
-  name      String    // Misal "SPP Bulanan", "Uang Gedung", "Seragam"
-  type      BillType  @default(BULANAN)
-  nominal   Decimal   // Nominal standar
-  bills     Tagihan[]
-  createdAt DateTime  @default(now())
-}
-
-model Tagihan {
-  id             String        @id @default(uuid())
-  siswaId        String
-  siswa          Siswa         @relation(fields: [siswaId], references: [id])
-  jenisTagihanId String
-  jenisTagihan   JenisTagihan  @relation(fields: [jenisTagihanId], references: [id])
-  tahunAjaranId  String
-  tahunAjaran    TahunAjaran   @relation(fields: [tahunAjaranId], references: [id])
-  nominalAwal    Decimal       // Nominal standar tagihan
-  potongan       Decimal       @default(0) // Potongan beasiswa/keringanan khusus
-  nominalAkhir   Decimal       // Nominal yang wajib dibayar (nominalAwal - potongan)
-  dueDate        DateTime
-  period         String?       // Format "YYYY-MM" untuk bulanan
-  catatanTagihan String?       // Keterangan khusus (misal: "Keringanan 50%")
-  status         BillStatus    @default(BELUM_BAYAR)
-  payments       Pembayaran[]
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
-}
-
-model Pembayaran {
-  id               String      @id @default(uuid())
-  tagihanId        String
-  tagihan          Tagihan     @relation(fields: [tagihanId], references: [id], onDelete: Cascade)
-  buktiUrl         String      // URL Vercel Blob Storage
-  catatanWali      String?
-  catatanAdmin     String?     // Catatan jika ditolak Admin
-  catatanBendahara String?     // Catatan jika ditolak Bendahara
-  verifiedAt       DateTime?   // Tanggal verifikasi Admin (Tahap 1)
-  approvedAt       DateTime?   // Tanggal approval final Bendahara (Tahap 2)
-  createdAt        DateTime    @default(now())
-  updatedAt        DateTime    @updatedAt
-}
-
-model Notification {
-  id        String   @id @default(uuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  title     String
-  message   String
-  isRead    Boolean  @default(false)
-  createdAt DateTime @default(now())
-}
+// ===================================================================================
+// KEBUTUHAN DATA DAN STRUKTUR MODEL (YAFI):
+// ===================================================================================
+//
+// 1. Model User:
+//    - Menyimpan data kredensial untuk login seluruh role.
+//    - Field: id, username (unik), phone (unik, untuk login Wali & WhatsApp),
+//             email, passwordHash, name, role (Enum: ADMIN, WALIMURID, BENDAHARA).
+//
+// 2. Model WaliMurid:
+//    - Profil tambahan khusus untuk Wali Murid.
+//    - Relasi 1-to-1 dengan Model User.
+//    - Field: id, userId, alamat.
+//
+// 3. Model Kelas:
+//    - Menyimpan data kelas (contoh: "7A", "8B").
+//    - Field: id, name (unik).
+//
+// 4. Model TahunAjaran:
+//    - Mengelola tahun ajaran aktif (contoh: "2025/2026").
+//    - Field: id, year (unik), isActive (Boolean, default: false).
+//
+// 5. Model Siswa:
+//    - Menyimpan data profil santri/siswa.
+//    - Relasi Many-to-1 dengan Kelas.
+//    - Relasi Many-to-1 dengan WaliMurid (Wali Murid bisa terhubung ke lebih dari 1 siswa).
+//    - Field: id, nisn (unik), name, kelasId, waliId, potonganTetap (Decimal, untuk beasiswa).
+//
+// 6. Model JenisTagihan:
+//    - Template jenis tagihan (contoh: "SPP Bulanan", "Uang Gedung").
+//    - Field: id, name, type (Enum: BULANAN, TAHUNAN), nominal (Decimal).
+//
+// 7. Model Tagihan:
+//    - Data tagihan riil yang diterbitkan untuk siswa.
+//    - Relasi Many-to-1 dengan Siswa, JenisTagihan, dan TahunAjaran.
+//    - Menghitung potongan beasiswa secara otomatis.
+//    - Field: id, siswaId, jenisTagihanId, tahunAjaranId, nominalAwal, potongan, 
+//             nominalAkhir, dueDate, period, status (Enum: BillStatus), catatanTagihan.
+//
+// 8. Model Pembayaran:
+//    - Menyimpan log bukti transfer yang diunggah wali murid dan riwayat verifikasi.
+//    - Relasi Many-to-1 dengan Tagihan.
+//    - Field: id, tagihanId, buktiUrl (Vercel Blob), catatanWali, catatanAdmin, 
+//             catatanBendahara, verifiedAt (tahap 1), approvedAt (tahap 2).
+//
+// 9. Model Notification:
+//    - Menyimpan log notifikasi in-app untuk dikirim ke user.
+//    - Field: id, userId, title, message, isRead.
+//
+// ===================================================================================
+// ENUMERASI STATUS:
+// ===================================================================================
+//
+// - Role: ADMIN, WALIMURID, BENDAHARA
+// - BillType: BULANAN, TAHUNAN
+// - BillStatus (Dual-Approval Workflow):
+//   1. BELUM_BAYAR (Baru diterbitkan)
+//   2. MENUNGGU_VERIFIKASI_ADMIN (Bukti diunggah wali, menunggu verifikasi Admin TU)
+//   3. MENUNGGU_APPROVAL_BENDAHARA (Lolos verifikasi TU, menunggu approval Bendahara)
+//   4. LUNAS (Disetujui final oleh Bendahara, kwitansi aktif)
+//   5. DITOLAK_ADMIN (Bukti transfer ditolak oleh Admin TU)
+//   6. DITOLAK_BENDAHARA (Bukti transfer ditolak oleh Bendahara)
+//
+// ===================================================================================
+// LANGKAH PENGEMBANGAN OLEH YAFI:
+// ===================================================================================
+// 1. Tulis skema lengkap Prisma (ambil dari .agent/implementation_plan.md).
+// 2. Hubungkan URL database di file .env.
+// 3. Jalankan 'npx prisma migrate dev --name init' untuk membuat tabel fisik di Postgres.
+// ===================================================================================
