@@ -1,80 +1,127 @@
-// ===================================================================================
-// TANGGUNG JAWAB: Yafi (Database & Data Modeling)
-// Deskripsi: Berkas cetak biru kebutuhan basis data untuk aplikasi Saku Santri.
-//            Yafi bertanggung jawab menuliskan skema Prisma nyata di sini
-//            dan melakukan migrasi basis data.
-// 
-// *Catatan: Skema lengkap yang siap pakai disimpan di berkas:
-//  .agent/implementation_plan.md
-// ===================================================================================
+generator client {
+  provider = "prisma-client-js"
+}
 
-// ===================================================================================
-// KEBUTUHAN DATA DAN STRUKTUR MODEL (YAFI):
-// ===================================================================================
-//
-// 1. Model User:
-//    - Menyimpan data kredensial untuk login seluruh role.
-//    - Field: id, username (unik), phone (unik, untuk login Wali & WhatsApp),
-//             email, passwordHash, name, role (Enum: ADMIN, WALIMURID, BENDAHARA).
-//
-// 2. Model WaliMurid:
-//    - Profil tambahan khusus untuk Wali Murid.
-//    - Relasi 1-to-1 dengan Model User.
-//    - Field: id, userId, alamat.
-//
-// 3. Model Kelas:
-//    - Menyimpan data kelas (contoh: "7A", "8B").
-//    - Field: id, name (unik).
-//
-// 4. Model TahunAjaran:
-//    - Mengelola tahun ajaran aktif (contoh: "2025/2026").
-//    - Field: id, year (unik), isActive (Boolean, default: false).
-//
-// 5. Model Siswa:
-//    - Menyimpan data profil santri/siswa.
-//    - Relasi Many-to-1 dengan Kelas.
-//    - Relasi Many-to-1 dengan WaliMurid (Wali Murid bisa terhubung ke lebih dari 1 siswa).
-//    - Field: id, nisn (unik), name, kelasId, waliId, potonganTetap (Decimal, untuk beasiswa).
-//
-// 6. Model JenisTagihan:
-//    - Template jenis tagihan (contoh: "SPP Bulanan", "Uang Gedung").
-//    - Field: id, name, type (Enum: BULANAN, TAHUNAN), nominal (Decimal).
-//
-// 7. Model Tagihan:
-//    - Data tagihan riil yang diterbitkan untuk siswa.
-//    - Relasi Many-to-1 dengan Siswa, JenisTagihan, dan TahunAjaran.
-//    - Menghitung potongan beasiswa secara otomatis.
-//    - Field: id, siswaId, jenisTagihanId, tahunAjaranId, nominalAwal, potongan, 
-//             nominalAkhir, dueDate, period, status (Enum: BillStatus), catatanTagihan.
-//
-// 8. Model Pembayaran:
-//    - Menyimpan log bukti transfer yang diunggah wali murid dan riwayat verifikasi.
-//    - Relasi Many-to-1 dengan Tagihan.
-//    - Field: id, tagihanId, buktiUrl (Vercel Blob), catatanWali, catatanAdmin, 
-//             catatanBendahara, verifiedAt (tahap 1), approvedAt (tahap 2).
-//
-// 9. Model Notification:
-//    - Menyimpan log notifikasi in-app untuk dikirim ke user.
-//    - Field: id, userId, title, message, isRead.
-//
-// ===================================================================================
-// ENUMERASI STATUS:
-// ===================================================================================
-//
-// - Role: ADMIN, WALIMURID, BENDAHARA
-// - BillType: BULANAN, TAHUNAN
-// - BillStatus (Dual-Approval Workflow):
-//   1. BELUM_BAYAR (Baru diterbitkan)
-//   2. MENUNGGU_VERIFIKASI_ADMIN (Bukti diunggah wali, menunggu verifikasi Admin TU)
-//   3. MENUNGGU_APPROVAL_BENDAHARA (Lolos verifikasi TU, menunggu approval Bendahara)
-//   4. LUNAS (Disetujui final oleh Bendahara, kwitansi aktif)
-//   5. DITOLAK_ADMIN (Bukti transfer ditolak oleh Admin TU)
-//   6. DITOLAK_BENDAHARA (Bukti transfer ditolak oleh Bendahara)
-//
-// ===================================================================================
-// LANGKAH PENGEMBANGAN OLEH YAFI:
-// ===================================================================================
-// 1. Tulis skema lengkap Prisma (ambil dari .agent/implementation_plan.md).
-// 2. Hubungkan URL database di file .env.
-// 3. Jalankan 'npx prisma migrate dev --name init' untuk membuat tabel fisik di Postgres.
-// ===================================================================================
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String         @id @default(uuid()) @db.Uuid
+  username      String         @unique
+  email         String?        @unique
+  phone         String?        @unique
+  passwordHash  String
+  name          String
+  role          UserRole
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  wali          WaliMurid?
+  notifications Notification[]
+}
+
+model WaliMurid {
+  id      String   @id @default(uuid()) @db.Uuid
+  user    User     @relation(fields: [userId], references: [id])
+  userId  String   @unique @db.Uuid
+  alamat  String?
+  siswa   Siswa[]
+}
+
+model Kelas {
+  id      String   @id @default(uuid()) @db.Uuid
+  name    String   @unique
+  siswa   Siswa[]
+}
+
+model TahunAjaran {
+  id       String   @id @default(uuid()) @db.Uuid
+  year     String   @unique
+  isActive Boolean  @default(false)
+  tagihan  Tagihan[]
+}
+
+model Siswa {
+  id            String    @id @default(uuid()) @db.Uuid
+  nisn          String    @unique
+  name          String
+  kelas         Kelas     @relation(fields: [kelasId], references: [id])
+  kelasId       String    @db.Uuid
+  wali          WaliMurid @relation(fields: [waliId], references: [id])
+  waliId        String    @db.Uuid
+  potonganTetap Decimal   @default("0.0")
+  tagihan       Tagihan[]
+}
+
+model JenisTagihan {
+  id      String       @id @default(uuid()) @db.Uuid
+  name    String
+  type    TagihanType
+  nominal Decimal
+  tagihan Tagihan[]
+}
+
+model Tagihan {
+  id             String         @id @default(uuid()) @db.Uuid
+  siswa          Siswa          @relation(fields: [siswaId], references: [id])
+  siswaId        String         @db.Uuid
+  jenisTagihan   JenisTagihan   @relation(fields: [jenisTagihanId], references: [id])
+  jenisTagihanId String         @db.Uuid
+  tahunAjaran    TahunAjaran    @relation(fields: [tahunAjaranId], references: [id])
+  tahunAjaranId  String         @db.Uuid
+  nominalAwal    Decimal
+  potongan       Decimal        @default("0.0")
+  nominalAkhir   Decimal
+  dueDate        DateTime
+  period         String
+  status         TagihanStatus  @default(BELUM_BAYAR)
+  catatanTagihan String?
+  pembayaran     Pembayaran?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+}
+
+model Pembayaran {
+  id              String   @id @default(uuid()) @db.Uuid
+  tagihan         Tagihan  @relation(fields: [tagihanId], references: [id])
+  tagihanId       String   @unique @db.Uuid
+  buktiUrl        String?
+  catatanWali     String?
+  catatanAdmin    String?
+  catatanBendahara String?
+  verifiedAt      DateTime?
+  approvedAt      DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Notification {
+  id        String   @id @default(uuid()) @db.Uuid
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String   @db.Uuid
+  title     String
+  message   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+enum UserRole {
+  ADMIN
+  WALIMURID
+  BENDAHARA
+}
+
+enum TagihanType {
+  BULANAN
+  TAHUNAN
+}
+
+enum TagihanStatus {
+  BELUM_BAYAR
+  MENUNGGU_VERIFIKASI_ADMIN
+  MENUNGGU_APPROVAL_BENDAHARA
+  LUNAS
+  DITOLAK_ADMIN
+  DITOLAK_BENDAHARA
+}
