@@ -1,0 +1,56 @@
+<!DOCTYPE html><html lang="en" style=""><head><meta charset="utf-8"><meta content="width=device-width, initial-scale=1.0" name="viewport"><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config={theme:{extend:{"colors":{"secondary-container":"#d1e1f5","outline":"#717975","on-primary-container":"#a3d4c3","surface-variant":"#e6e2da","error-container":"#ffdad6","error":"#ba1a1a","on-tertiary-container":"#4f3d00","on-error-container":"#93000a","outline-variant":"#c0c8c4","on-tertiary-fixed-variant":"#584400","primary-fixed-dim":"#a0d1c0","tertiary-fixed-dim":"#ecc246","surface-container":"#f1ede6","on-surface":"#1c1c17","surface-container-high":"#ece8e0","inverse-surface":"#31302b","inverse-on-surface":"#f4f0e8","on-tertiary":"#ffffff","secondary":"#516071","surface-tint":"#396759","primary-container":"#2f5d50","surface-container-highest":"#e6e2da","primary":"#154539","on-background":"#1c1c17","surface-dim":"#dddad2","background":"#fdf9f1","surface-container-low":"#f7f3eb","on-secondary-container":"#556475","on-error":"#ffffff","on-tertiary-fixed":"#241a00","tertiary":"#755b00","on-primary":"#ffffff","surface-container-lowest":"#ffffff","on-surface-variant":"#404945","on-primary-fixed":"#002019","on-secondary":"#ffffff","on-secondary-fixed-variant":"#394858","secondary-fixed-dim":"#b8c8dc","on-primary-fixed-variant":"#204f42","surface-bright":"#fdf9f1","secondary-fixed":"#d4e4f8","surface":"#fdf9f1","inverse-primary":"#a0d1c0","tertiary-container":"#cea62c","tertiary-fixed":"#ffe08e","primary-fixed":"#bceddc","on-secondary-fixed":"#0d1d2b"},"borderRadius":{"DEFAULT":"0.125rem","lg":"0.25rem","xl":"0.5rem","full":"0.75rem"},"spacing":{"unit":"4px","xs":"4px","margin":"32px","md":"16px","xl":"48px","sm":"8px","lg":"24px","gutter":"24px"},"fontFamily":{"headline-lg":["Source Serif 4"],"body-lg":["IBM Plex Sans"],"display-lg":["Source Serif 4"],"label-caps":["IBM Plex Sans"],"headline-sm":["Source Serif 4"],"number-md":["JetBrains Mono"],"body-md":["IBM Plex Sans"],"headline-md":["Source Serif 4"],"number-lg":["JetBrains Mono"],"body-sm":["IBM Plex Sans"]},"fontSize":{"headline-lg":["32px",{"lineHeight":"40px","fontWeight":"600"}],"body-lg":["18px",{"lineHeight":"28px","fontWeight":"400"}],"display-lg":["48px",{"lineHeight":"56px","letterSpacing":"-0.02em","fontWeight":"700"}],"label-caps":["12px",{"lineHeight":"16px","letterSpacing":"0.05em","fontWeight":"700"}],"headline-sm":["20px",{"lineHeight":"28px","fontWeight":"600"}],"number-md":["16px",{"lineHeight":"20px","fontWeight":"500"}],"body-md":["16px",{"lineHeight":"24px","fontWeight":"400"}],"headline-md":["24px",{"lineHeight":"32px","fontWeight":"600"}],"number-lg":["20px",{"lineHeight":"24px","fontWeight":"500"}],"body-sm":["14px",{"lineHeight":"20px","fontWeight":"400"}]}}}}</script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@100..900&amp;family=Source+Serif+4:wght@100..900&amp;display=swap" rel="stylesheet"></head><body class="bg-background font-body-md text-on-surface flex items-center justify-center min-h-screen"><main class="w-full max-w-md"><div class="flex flex-col w-full h-full justify-center items-center relative overflow-hidden bg-background">
+<div class="absolute inset-0 pointer-events-none opacity-20" style="background-image: repeating-linear-gradient(to right, transparent, transparent 31px, var(--tw-colors-outline-variant) 31px, var(--tw-colors-outline-variant) 32px); background-size: 32px 100%;"></div>
+<div class="absolute left-[15%] top-0 bottom-0 w-px bg-outline hidden md:block"></div>
+<div class="absolute right-[15%] top-0 bottom-0 w-px bg-outline hidden md:block"></div>
+<div class="w-full max-w-[480px] p-xl relative z-10">
+<div class="bg-surface-container-lowest border border-outline shadow-xl flex flex-col p-lg md:p-xl relative">
+<div class="absolute top-0 left-0 w-full h-2 bg-primary"></div>
+<div class="text-center mb-xl">
+<h1 class="font-display-lg text-display-lg text-on-surface mb-sm">Saku Santri</h1>
+<p class="font-body-md text-body-md text-secondary uppercase tracking-widest border-t border-outline-variant pt-sm inline-block">Sistem Administrasi Keuangan Bitul arqom</p>
+</div>
+<form class="flex flex-col gap-lg w-full">
+<div class="flex flex-col gap-xs relative">
+<label class="font-label-caps text-label-caps text-on-surface-variant uppercase" for="id_pengguna">Nomor Induk / ID Pengguna</label>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-md top-1/2 -translate-y-1/2 text-outline-variant pointer-events-none select-none">badge</span>
+<input class="w-full h-12 bg-surface-bright border border-outline text-on-surface font-number-md text-number-md pl-12 pr-md focus:border-primary focus:border-2 focus:outline-none transition-colors rounded" id="id_pengguna" name="id_pengguna" placeholder="Masukkan ID Anda" type="text">
+</div>
+</div>
+<div class="flex flex-col gap-xs relative">
+<label class="font-label-caps text-label-caps text-on-surface-variant uppercase" for="kata_sandi">Kata Sandi</label>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-md top-1/2 -translate-y-1/2 text-outline-variant pointer-events-none select-none">lock</span>
+<input class="w-full h-12 bg-surface-bright border border-outline text-on-surface font-number-md text-number-md pl-12 pr-12 focus:border-primary focus:border-2 focus:outline-none transition-colors rounded" id="kata_sandi" name="kata_sandi" placeholder="••••••••" type="password">
+<button aria-label="Toggle password visibility" class="absolute right-md top-1/2 -translate-y-1/2 text-outline hover:text-primary transition-colors focus:outline-none flex items-center justify-center" type="button">
+<span class="material-symbols-outlined" style="font-size: 20px;">visibility_off</span>
+</button>
+</div>
+<div class="flex justify-end mt-xs">
+<a class="font-body-sm text-body-sm text-primary hover:underline underline-offset-2" href="#">Lupa Kata Sandi?</a>
+</div>
+</div>
+<div class="mt-md border-t border-outline-variant pt-lg">
+<button class="w-full h-12 bg-primary hover:bg-primary-container text-on-primary font-label-caps text-label-caps uppercase flex items-center justify-center gap-sm transition-colors rounded" type="submit">
+<span class="">Otorisasi Masuk</span>
+<span class="material-symbols-outlined" style="font-size: 18px;">login</span>
+</button>
+</div>
+<div class="text-center mt-md">
+<p class="font-body-sm text-body-sm text-outline-variant flex items-center justify-center gap-xs">
+<span class="material-symbols-outlined" style="font-size: 16px;">verified_user</span>
+                    Koneksi Terenkripsi
+                </p>
+</div>
+</form>
+</div>
+<div class="mt-lg text-center flex justify-between items-center text-outline font-number-md text-sm border-t border-outline-variant pt-sm">
+<span class="">V 2.4.1</span>
+<span class="">© 2024</span>
+</div>
+</div>
+</div></main>
+
+</body></html>
