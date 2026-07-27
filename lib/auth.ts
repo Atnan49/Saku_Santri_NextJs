@@ -128,5 +128,5 @@ export const authOptions: AuthOptions = {
     maxAge: 24 * 60 * 60, // 24 jam
   },
 
-  secret: process.env.NEXTAUTH_SECRET,
+  secret: process.env.NEXTAUTH_SECRET || "dev-secret-key-change-in-production-32chars!",
 };
