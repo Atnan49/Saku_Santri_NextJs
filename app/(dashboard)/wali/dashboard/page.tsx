@@ -12,54 +12,81 @@
 import React from "react";
 import GlassCard from "@/components/ui/GlassCard";
 import StatusBadge from "@/components/ui/StatusBadge";
+import { getWaliDashboardData } from "@/lib/actions/laporan";
+import { formatIDR, formatDateIndonesian } from "@/lib/utils";
 
 export default async function WaliDashboardPage() {
-  // TODO (Atnan): Dapatkan session user wali murid, lalu ambil data profil wali murid,
-  //               anak-anaknya, dan status tagihan masing-masing anak.
+  const wali = await getWaliDashboardData().catch(() => null);
+
+  const waliName = wali?.user.name || "Wali Murid";
+  const students = wali?.siswa || [];
+  const primaryStudent = students[0];
+  const bills = primaryStudent?.tagihan || [];
 
   return (
     <div className="ios-viewport">
       <header className="ios-header">
         <span className="greeting">Assalamu'alaikum,</span>
-        <h1 className="wali-name">Nama Wali Murid</h1>
+        <h1 className="wali-name">{waliName}</h1>
       </header>
 
       <section className="ios-wallet-section">
-        {/* 
-          TODO (Usva): 
-          1. Desain tumpukan kartu anak (iOS Wallet Stack) di sini.
-          2. Klik kartu anak untuk mengganti fokus tagihan anak yang aktif.
-        */}
         <div className="wallet-cards-stack">
-          <GlassCard className="wallet-card wallet-card-active">
-            <span className="student-badge">Siswa 1</span>
-            <h2>Nama Anak Pertama</h2>
-            <p className="student-info">Kelas 7A | NISN: 123456</p>
-            <div className="card-footer">
-              <span>Sisa Tagihan:</span>
-              <span className="tagihan-amount">Rp 0</span>
-            </div>
-          </GlassCard>
+          {students.length > 0 ? (
+            students.map((student: any, idx: number) => {
+              const studentUnpaid = (student.tagihan || [])
+                .filter((b: any) => b.status !== "LUNAS")
+                .reduce((sum: number, b: any) => sum + Number(b.nominalAkhir), 0);
+
+              return (
+                <GlassCard
+                  key={student.id}
+                  className={`wallet-card ${idx === 0 ? "wallet-card-active" : ""}`}
+                >
+                  <span className="student-badge">Siswa {idx + 1}</span>
+                  <h2>{student.name}</h2>
+                  <p className="student-info">
+                    Kelas {student.kelas.name} | NISN: {student.nisn}
+                  </p>
+                  <div className="card-footer">
+                    <span>Sisa Tagihan:</span>
+                    <span className="tagihan-amount">{formatIDR(studentUnpaid)}</span>
+                  </div>
+                </GlassCard>
+              );
+            })
+          ) : (
+            <GlassCard className="wallet-card wallet-card-active">
+              <h2>Belum Ada Data Siswa</h2>
+              <p className="student-info">Hubungi TU untuk menghubungkan akun</p>
+            </GlassCard>
+          )}
         </div>
       </section>
 
       <section className="ios-bill-list-section">
         <h3>Daftar Tagihan</h3>
-        {/* 
-          TODO (Usva): Buat list tagihan bergaya iOS list item.
-          Ketuk tagihan untuk memicu bottom sheet detail.
-        */}
         <div className="ios-list">
-          <div className="ios-list-item">
-            <div className="item-info">
-              <span className="item-title">SPP Bulan Juli 2026</span>
-              <span className="item-due">Jatuh tempo: 10 Juli 2026</span>
-            </div>
-            <div className="item-status-amount">
-              <span className="item-amount">Rp 500.000</span>
-              <StatusBadge status="BELUM_BAYAR" />
-            </div>
-          </div>
+          {bills.length > 0 ? (
+            bills.map((bill: any) => (
+              <div className="ios-list-item" key={bill.id}>
+                <div className="item-info">
+                  <span className="item-title">{bill.jenisTagihan.name}</span>
+                  <span className="item-due">
+                    Jatuh tempo: {formatDateIndonesian(bill.dueDate)}
+                  </span>
+                </div>
+                <div className="item-status-amount">
+                  <span className="item-amount">{formatIDR(bill.nominalAkhir.toString())}</span>
+                  <StatusBadge status={bill.status} />
+                </div>
+              </div>
+            ))
+          ) : (
+            <p style={{ textAlign: "center", opacity: 0.7, padding: "1rem" }}>
+              Belum ada tagihan terbit.
+            </p>
+          )}
         </div>
       </section>
     </div>

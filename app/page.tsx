@@ -9,27 +9,26 @@
 // =========================================================================
 
 import { redirect } from "next/navigation";
-// import { getServerSession } from "next-auth";
-// import { authOptions } from "@/lib/auth";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 
 export default async function IndexPage() {
-  // TODO (Atnan): Dapatkan session server, cek role, lalu redirect ke dashboard yang sesuai.
-  // const session = await getServerSession(authOptions);
-  
-  // Jika belum login:
-  // redirect("/login");
+  const session = await getServerSession(authOptions);
 
-  // Jika ADMIN:
-  // redirect("/admin/dashboard");
+  if (!session) {
+    redirect("/login");
+  }
 
-  // Jika BENDAHARA:
-  // redirect("/bendahara/dashboard");
+  const role = session.user?.role;
 
-  // Jika WALIMURID:
-  // redirect("/wali/dashboard");
-
-  // Placeholder default (sementara redirect ke login):
-  redirect("/login");
-  
-  return null;
+  switch (role) {
+    case "ADMIN":
+      redirect("/admin/dashboard");
+    case "BENDAHARA":
+      redirect("/bendahara/dashboard");
+    case "WALIMURID":
+      redirect("/wali/dashboard");
+    default:
+      redirect("/login");
+  }
 }

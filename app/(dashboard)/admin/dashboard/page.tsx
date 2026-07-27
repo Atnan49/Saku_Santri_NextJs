@@ -13,36 +13,38 @@
 import React from "react";
 import MacWindowHeader from "@/components/ui/MacWindowHeader";
 import GlassCard from "@/components/ui/GlassCard";
+import { getAdminDashboardStats } from "@/lib/actions/laporan";
+import { formatIDR } from "@/lib/utils";
 
 export default async function AdminDashboardPage() {
-  // TODO (Atnan): Ambil data rekapitulasi (total tagihan, total siswa, antrean verifikasi) dari DB prisma.
-  
+  const stats = await getAdminDashboardStats().catch(() => ({
+    totalSiswa: 0,
+    pendingVerification: 0,
+    totalTagihanBulanIni: 0,
+  }));
+
   return (
     <div className="admin-dashboard-container">
       <MacWindowHeader title="Dashboard Tata Usaha" />
       
       <div className="dashboard-grid">
-        {/* 
-          TODO (Usva): Desain kartu-kartu summary ini dengan GlassCard.
-        */}
         <GlassCard className="summary-card">
           <h3>Total Siswa</h3>
-          <p className="summary-value">0</p>
+          <p className="summary-value">{stats.totalSiswa} Siswa</p>
         </GlassCard>
 
         <GlassCard className="summary-card">
           <h3>Menunggu Verifikasi</h3>
-          <p className="summary-value">0 Transaksi</p>
+          <p className="summary-value">{stats.pendingVerification} Transaksi</p>
         </GlassCard>
 
         <GlassCard className="summary-card">
           <h3>Total Tagihan Bulan Ini</h3>
-          <p className="summary-value">Rp 0</p>
+          <p className="summary-value">{formatIDR(stats.totalTagihanBulanIni)}</p>
         </GlassCard>
       </div>
 
       <div className="dashboard-charts-section">
-        {/* TODO (Usva): Tambahkan visualisasi grafik di sini */}
         <GlassCard className="chart-card">
           <h3>Grafik Penerimaan & Tunggakan</h3>
           <div className="chart-placeholder">[Grafik Tren Keuangan]</div>

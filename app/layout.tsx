@@ -13,6 +13,7 @@
 import React from "react";
 import type { Metadata } from "next";
 import "./globals.css"; // Usva akan mengelola styling global di file ini
+import NextAuthProvider from "@/components/providers/NextAuthProvider";
 
 export const metadata: Metadata = {
   title: "Saku Santri - Sistem Keuangan Pesantren",
@@ -23,16 +24,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="id">
       <body>
-        {/* 
-          TODO (Atnan): Bungkus dengan SessionProvider agar autentikasi aktif.
-          Contoh:
-          <NextAuthProvider>
+        <NextAuthProvider>
+          <div className="app-layout-wrapper">
             {children}
-          </NextAuthProvider>
-        */}
-        <div className="app-layout-wrapper">
-          {children}
-        </div>
+          </div>
+        </NextAuthProvider>
       </body>
     </html>
   );

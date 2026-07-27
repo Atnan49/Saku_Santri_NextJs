@@ -11,25 +11,44 @@
 "use client";
 
 import React, { useState } from "react";
-// import { signIn } from "next-auth/react";
+import { signIn } from "next-auth/react";
+import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
   const [identifier, setIdentifier] = useState(""); // No HP / Username
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setLoading(true);
 
-    // TODO (Atnan): Panggil signIn NextAuth di sini.
-    // const res = await signIn("credentials", {
-    //   username: identifier,
-    //   password,
-    //   redirect: false,
-    // });
-    // if (res?.error) setError("Autentikasi gagal. Periksa kembali data Anda.");
-    console.log("Login submitted:", { identifier, password });
+    try {
+      const res = await signIn("credentials", {
+        username: identifier.trim(),
+        password,
+        redirect: false,
+      });
+
+      if (res?.error) {
+        // NextAuth mengembalikan error message dari authorize()
+        setError(res.error === "CredentialsSignin"
+          ? "Login gagal. Periksa kembali data Anda."
+          : res.error
+        );
+      } else if (res?.ok) {
+        // Login berhasil — redirect ke halaman utama (root page akan mengarahkan ke dashboard)
+        router.push("/");
+        router.refresh();
+      }
+    } catch (err) {
+      setError("Terjadi kesalahan jaringan. Coba lagi.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -51,6 +70,7 @@ export default function LoginPage() {
             onChange={(e) => setIdentifier(e.target.value)}
             placeholder="Masukkan No HP atau Username"
             required
+            disabled={loading}
           />
         </div>
         <div className="input-group">
@@ -62,9 +82,12 @@ export default function LoginPage() {
             onChange={(e) => setPassword(e.target.value)}
             placeholder="••••••••"
             required
+            disabled={loading}
           />
         </div>
-        <button type="submit" className="login-btn">Masuk</button>
+        <button type="submit" className="login-btn" disabled={loading}>
+          {loading ? "Memproses..." : "Masuk"}
+        </button>
       </form>
     </div>
   );

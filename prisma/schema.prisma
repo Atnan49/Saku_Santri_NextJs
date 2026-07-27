@@ -56,7 +56,7 @@ model Siswa {
 
 model JenisTagihan {
   id      String       @id @default(uuid()) @db.Uuid
-  name    String
+  name    String       @unique
   type    TagihanType
   nominal Decimal
   tagihan Tagihan[]
