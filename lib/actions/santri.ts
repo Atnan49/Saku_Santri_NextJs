@@ -65,7 +65,7 @@ export async function getSantriById(id: string) {
 // ========== CREATE ==========
 
 export async function createSantri(data: {
-  nisn: string;
+  nisn?: string;
   name: string;
   kelasId: string;
   waliId: string;
@@ -73,17 +73,25 @@ export async function createSantri(data: {
 }) {
   await requireAdmin();
 
+  let finalNisn = data.nisn?.trim();
+  if (!finalNisn) {
+    const year = new Date().getFullYear();
+    const count = await prisma.siswa.count();
+    finalNisn = `SNT-${year}-${String(count + 1).padStart(4, "0")}`;
+  }
+
   // Validasi NISN unik
   const existing = await prisma.siswa.findUnique({
-    where: { nisn: data.nisn },
+    where: { nisn: finalNisn },
   });
   if (existing) {
-    throw new Error(`NISN ${data.nisn} sudah terdaftar untuk siswa lain.`);
+    // Jika bentrok, tambahkan timestamp acak
+    finalNisn = `SNT-${Date.now().toString().slice(-6)}`;
   }
 
   const santri = await prisma.siswa.create({
     data: {
-      nisn: data.nisn,
+      nisn: finalNisn,
       name: data.name,
       kelasId: data.kelasId,
       waliId: data.waliId,

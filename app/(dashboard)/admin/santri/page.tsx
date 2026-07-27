@@ -69,7 +69,7 @@ export default function AdminSantriPage() {
 
   const handleAddSantri = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!nama || !nisn) return;
+    if (!nama) return;
     setSaving(true);
     setErrorMessage("");
 
@@ -88,9 +88,10 @@ export default function AdminSantriPage() {
         password: "wali123",
       });
 
-      // 3. Buat Santri
+      // 3. Buat Santri dengan Kode Unik Otomatis
+      const autoNisn = `SNT-${new Date().getFullYear()}-${String(santriList.length + 1).padStart(4, "0")}`;
       await createSantri({
-        nisn: nisn.trim(),
+        nisn: autoNisn,
         name: nama.trim(),
         kelasId: selectedKelas.id,
         waliId: waliRes.waliId!,
@@ -170,7 +171,7 @@ export default function AdminSantriPage() {
               <Search size={16} style={{ position: "absolute", left: "0.75rem", color: "var(--text-muted)" }} />
               <input
                 type="text"
-                placeholder="Cari Nama Santri / NISN..."
+                placeholder="Cari Nama Santri / Kode Unik..."
                 style={{
                   width: "100%",
                   paddingLeft: "2.25rem",
@@ -199,7 +200,7 @@ export default function AdminSantriPage() {
             <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "0.88rem" }}>
               <thead>
                 <tr style={{ backgroundColor: "#f7f3eb", borderBottom: "1px solid var(--border-glass)" }}>
-                  <th style={{ padding: "0.85rem 1rem", fontSize: "0.75rem", fontWeight: 800, color: "#516071", textTransform: "uppercase" }}>NISN</th>
+                  <th style={{ padding: "0.85rem 1rem", fontSize: "0.75rem", fontWeight: 800, color: "#516071", textTransform: "uppercase" }}>Kode Unik Santri</th>
                   <th style={{ padding: "0.85rem 1rem", fontSize: "0.75rem", fontWeight: 800, color: "#516071", textTransform: "uppercase" }}>Nama Santri</th>
                   <th style={{ padding: "0.85rem 1rem", fontSize: "0.75rem", fontWeight: 800, color: "#516071", textTransform: "uppercase" }}>Kelas</th>
                   <th style={{ padding: "0.85rem 1rem", fontSize: "0.75rem", fontWeight: 800, color: "#516071", textTransform: "uppercase" }}>Wali Murid (No. HP)</th>
@@ -267,14 +268,12 @@ export default function AdminSantriPage() {
 
             <form onSubmit={handleAddSantri} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
               <div>
-                <label style={{ fontSize: "0.75rem", fontWeight: 800, textTransform: "uppercase", color: "var(--text-muted)" }}>NISN Santri</label>
+                <label style={{ fontSize: "0.75rem", fontWeight: 800, textTransform: "uppercase", color: "var(--text-muted)" }}>Kode Unik Santri (Otomatis Sistem)</label>
                 <input
                   type="text"
-                  required
-                  placeholder="Contoh: 1234567890"
-                  value={nisn}
-                  onChange={(e) => setNisn(e.target.value)}
-                  style={{ width: "100%", padding: "0.6rem", border: "1px solid var(--border-glass)", borderRadius: "4px", marginTop: "0.2rem" }}
+                  readOnly
+                  value={`SNT-${new Date().getFullYear()}-${String(santriList.length + 1).padStart(4, "0")}`}
+                  style={{ width: "100%", padding: "0.6rem", border: "1px solid var(--border-glass)", borderRadius: "4px", marginTop: "0.2rem", backgroundColor: "#f0f4f2", color: "var(--primary)", fontWeight: 800, fontFamily: "'JetBrains Mono', monospace" }}
                 />
               </div>
 
