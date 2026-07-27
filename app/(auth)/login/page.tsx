@@ -8,6 +8,7 @@
 import React, { useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import { User, Lock, Eye, EyeOff, LogIn, ShieldCheck, Loader2 } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -48,92 +49,95 @@ export default function LoginPage() {
 
   return (
     <div className="login-page">
-        <div className="login-center">
-          <div className="login-card">
-            <div className="login-brand">
-              <h1>Saku Santri</h1>
-              <p>Sistem Administrasi Keuangan Beitul Arqom</p>
+      <div className="login-center">
+        <div className="login-card">
+          <div className="login-brand">
+            <h1>Saku Santri</h1>
+            <p>Sistem Administrasi Keuangan Beitul Arqom</p>
+          </div>
+
+          {error && <p className="login-error">{error}</p>}
+
+          <form onSubmit={handleSubmit} className="login-form">
+            {/* Nomor Induk / ID Pengguna */}
+            <div className="login-field">
+              <label className="login-label" htmlFor="id_pengguna">
+                Nomor Induk / ID Pengguna / Username
+              </label>
+              <div className="login-input-wrap">
+                <User className="login-input-icon" size={20} />
+                <input
+                  id="id_pengguna"
+                  type="text"
+                  className="login-input"
+                  placeholder="Masukkan ID / No. HP / Username"
+                  value={identifier}
+                  onChange={(e) => setIdentifier(e.target.value)}
+                  required
+                  disabled={loading}
+                  autoComplete="username"
+                />
+              </div>
             </div>
 
-            {error && <p className="login-error">{error}</p>}
-
-            <form onSubmit={handleSubmit} className="login-form">
-              {/* Nomor Induk / ID Pengguna */}
-              <div className="login-field">
-                <label className="login-label" htmlFor="id_pengguna">
-                  Nomor Induk / ID Pengguna / Username
-                </label>
-                <div className="login-input-wrap">
-                  <span className="login-input-icon material-symbols-outlined">badge</span>
-                  <input
-                    id="id_pengguna"
-                    type="text"
-                    className="login-input"
-                    placeholder="Masukkan ID / No. HP / Username"
-                    value={identifier}
-                    onChange={(e) => setIdentifier(e.target.value)}
-                    required
-                    disabled={loading}
-                    autoComplete="username"
-                  />
-                </div>
+            {/* Kata Sandi */}
+            <div className="login-field">
+              <label className="login-label" htmlFor="kata_sandi">
+                Kata Sandi
+              </label>
+              <div className="login-input-wrap">
+                <Lock className="login-input-icon" size={20} />
+                <input
+                  id="kata_sandi"
+                  type={showPassword ? "text" : "password"}
+                  className="login-input"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  disabled={loading}
+                  autoComplete="current-password"
+                />
+                <button
+                  type="button"
+                  className="login-eye-btn"
+                  onClick={() => setShowPassword(!showPassword)}
+                  aria-label="Toggle password visibility"
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
               </div>
+            </div>
 
-              {/* Kata Sandi */}
-              <div className="login-field">
-                <label className="login-label" htmlFor="kata_sandi">
-                  Kata Sandi
-                </label>
-                <div className="login-input-wrap">
-                  <span className="login-input-icon material-symbols-outlined">lock</span>
-                  <input
-                    id="kata_sandi"
-                    type={showPassword ? "text" : "password"}
-                    className="login-input"
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                    disabled={loading}
-                    autoComplete="current-password"
-                  />
-                  <button
-                    type="button"
-                    className="login-eye-btn"
-                    onClick={() => setShowPassword(!showPassword)}
-                    aria-label="Toggle password visibility"
-                  >
-                    <span className="material-symbols-outlined" style={{ fontSize: 20 }}>
-                      {showPassword ? "visibility_off" : "visibility"}
-                    </span>
-                  </button>
-                </div>
-              </div>
+            <hr className="login-divider" />
 
-              <hr className="login-divider" />
+            <button type="submit" className="login-btn" disabled={loading}>
+              {loading ? (
+                <>
+                  <Loader2 className="animate-spin" size={18} />
+                  <span>Memproses...</span>
+                </>
+              ) : (
+                <>
+                  <span>OTORISASI MASUK</span>
+                  <LogIn size={18} />
+                </>
+              )}
+            </button>
 
-              <button type="submit" className="login-btn" disabled={loading}>
-                <span>{loading ? "Memproses..." : "Otorisasi Masuk"}</span>
-                {!loading && (
-                  <span className="material-symbols-outlined" style={{ fontSize: 18 }}>
-                    login
-                  </span>
-                )}
-              </button>
-
-              <div className="login-koneksi">
-                <span className="material-symbols-outlined">verified_user</span>
-                <span>Koneksi Terenkripsi</span>
-              </div>
-            </form>
-          </div>
+            <div className="login-koneksi">
+              <ShieldCheck size={18} style={{ color: "#396759" }} />
+              <span>Koneksi Terenkripsi</span>
+            </div>
+          </form>
         </div>
-
-        <footer className="login-footer">
-          <span>V 2.4.1</span>
-          <span>© 2026</span>
-        </footer>
       </div>
+
+      <footer className="login-footer">
+        <span>V 2.4.1</span>
+        <span>© 2026</span>
+      </footer>
+    </div>
   );
 }
 
