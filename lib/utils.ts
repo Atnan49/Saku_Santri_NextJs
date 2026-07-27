@@ -6,8 +6,8 @@
 // =========================================================================
 
 // Format angka ke format mata uang Rupiah Indonesia (Rp xx.xxx.xxx)
-export function formatIDR(value: number | string | parseFloat): string {
-  const numericValue = typeof value === "string" ? parseFloat(value) : (value as number);
+export function formatIDR(value: number | string): string {
+  const numericValue = typeof value === "string" ? parseFloat(value) : value;
   if (isNaN(numericValue)) return "Rp 0";
   return new Intl.NumberFormat("id-ID", {
     style: "currency",
