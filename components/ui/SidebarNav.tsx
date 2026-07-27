@@ -55,9 +55,31 @@ export default function SidebarNav({
   return (
     <aside className="sidebar">
       <div>
-        <div className="sidebar-brand">
-          <div className="brand-icon">S</div>
-          <span className="brand-title">Saku Santri</span>
+        <div className="sidebar-brand" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+            <div className="brand-icon">S</div>
+            <span className="brand-title">Saku Santri</span>
+          </div>
+          <button
+            onClick={() => signOut({ callbackUrl: "/login" })}
+            className="mobile-logout-btn"
+            title="Keluar Sesi"
+            style={{
+              padding: "0.4rem 0.6rem",
+              fontSize: "0.75rem",
+              fontWeight: 700,
+              color: "var(--status-ditolak)",
+              backgroundColor: "var(--status-ditolak-bg)",
+              border: "1px solid var(--status-ditolak)",
+              borderRadius: "6px",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: "0.3rem",
+            }}
+          >
+            <LogOut size={14} /> Keluar
+          </button>
         </div>
 
         <nav className="sidebar-nav">

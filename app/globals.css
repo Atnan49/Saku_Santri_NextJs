@@ -508,3 +508,75 @@ body {
   justify-content: center;
   padding: 1.5rem;
 }
+
+/* =========================================================================
+   RESPONSIVE DESIGN (MOBILE & TABLET SUPPORT)
+   ========================================================================= */
+
+@media (max-width: 900px) {
+  .app-container {
+    flex-direction: column !important;
+  }
+
+  .sidebar {
+    width: 100% !important;
+    min-width: 100% !important;
+    height: auto !important;
+    position: relative !important;
+    padding: 1rem !important;
+    border-right: none !important;
+    border-bottom: 1px solid var(--border-glass) !important;
+  }
+
+  .sidebar-brand {
+    margin-bottom: 0.75rem !important;
+    padding-bottom: 0.75rem !important;
+  }
+
+  .sidebar-nav {
+    flex-direction: row !important;
+    flex-wrap: wrap !important;
+    gap: 0.4rem !important;
+  }
+
+  .nav-item {
+    padding: 0.45rem 0.65rem !important;
+    font-size: 0.72rem !important;
+  }
+
+  .sidebar-footer {
+    display: none !important;
+  }
+
+  .top-header {
+    padding: 0.75rem 1rem !important;
+    height: auto !important;
+    min-height: 56px !important;
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 0.5rem !important;
+  }
+
+  .header-actions {
+    width: 100% !important;
+    justify-content: space-between !important;
+  }
+
+  .search-box {
+    width: 100% !important;
+  }
+
+  .page-body {
+    padding: 1rem !important;
+    gap: 1.25rem !important;
+  }
+
+  div[style*="overflow: hidden"] {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  table {
+    min-width: 650px;
+  }
+}

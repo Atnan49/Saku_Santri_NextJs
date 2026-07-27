@@ -68,27 +68,7 @@ export default function WaliDashboardPage() {
         if (allBills.length > 0) {
           setTagihanList(allBills);
         } else {
-          // Fallback mock items for UI presentation if DB empty
-          setTagihanList([
-            {
-              id: "TAG-001",
-              periode: "Nov 2023",
-              anak: wali?.siswa?.[0]?.name || "Farhan S.",
-              keterangan: "SPP Bulanan",
-              nominal: 450000,
-              status: "BELUM_BAYAR",
-              dueDate: "2023-11-10",
-            },
-            {
-              id: "TAG-002",
-              periode: "Des 2023",
-              anak: wali?.siswa?.[0]?.name || "Farhan S.",
-              keterangan: "SPP Bulanan",
-              nominal: 450000,
-              status: "BELUM_BAYAR",
-              dueDate: "2023-12-10",
-            },
-          ]);
+          setTagihanList([]);
         }
       } catch (err) {
         console.error("Gagal memuat data wali dashboard:", err);
@@ -99,30 +79,7 @@ export default function WaliDashboardPage() {
     loadData();
   }, []);
 
-  const receiptsArchive: Array<DigitalReceiptData> = [
-    {
-      receiptNo: "KW-2310-091",
-      date: "2023-10-15",
-      receivedFrom: waliData?.user?.name ? `Wali dr. ${waliData.user.name}` : "Wali dr. Siti Aminah Z.",
-      studentName: waliData?.siswa?.[0]?.name || "Siti Aminah Zahra",
-      studentClass: waliData?.siswa?.[0]?.kelas?.name ? `Kelas ${waliData.siswa[0].kelas.name}` : "Kelas 3A",
-      amount: 450000,
-      paymentFor: "SPP Okt 2023",
-      verifiedBy: "Admin Utama",
-      paymentMethod: "Transfer BSI",
-    },
-    {
-      receiptNo: "KW-2309-142",
-      date: "2023-09-12",
-      receivedFrom: waliData?.user?.name ? `Wali dr. ${waliData.user.name}` : "Wali dr. Farhan S.",
-      studentName: waliData?.siswa?.[0]?.name || "M. Farhan Syahputra",
-      studentClass: waliData?.siswa?.[0]?.kelas?.name ? `Kelas ${waliData.siswa[0].kelas.name}` : "Kelas 5B",
-      amount: 450000,
-      paymentFor: "SPP Sep 2023",
-      verifiedBy: "Admin Utama",
-      paymentMethod: "Transfer Mandiri",
-    },
-  ];
+  const receiptsArchive: Array<DigitalReceiptData> = [];
 
   const handleToggleSelect = (id: string) => {
     setSelectedTagihan((prev) =>
@@ -285,33 +242,41 @@ export default function WaliDashboardPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {tagihanList.map((item) => {
-                        const isChecked = selectedTagihan.includes(item.id);
-                        return (
-                          <tr key={item.id} style={{ borderBottom: "1px solid var(--border-glass)", backgroundColor: isChecked ? "var(--bg-surface-hover)" : "transparent" }}>
-                            <td style={{ padding: "0.9rem 1rem", fontWeight: 600, color: "var(--text-main)" }}>{item.periode}</td>
-                            <td style={{ padding: "0.9rem 1rem", color: "var(--text-main)" }}>{item.anak}</td>
-                            <td style={{ padding: "0.9rem 1rem", fontWeight: 800, fontSize: "0.95rem", color: "var(--text-main)" }}>
-                              {item.keterangan}
-                            </td>
-                            <td style={{ padding: "0.9rem 1rem", fontWeight: 700, color: "var(--text-main)" }}>
-                              {formatIDR(item.nominal)}
-                            </td>
-                            <td style={{ padding: "0.9rem 1rem" }}>
-                              <StatusBadge status={item.status} />
-                            </td>
-                            <td style={{ padding: "0.9rem 1rem", textAlign: "center" }}>
-                              <input
-                                type="checkbox"
-                                checked={isChecked}
-                                disabled={item.status === "LUNAS" || item.status.includes("MENUNGGU")}
-                                onChange={() => handleToggleSelect(item.id)}
-                                style={{ width: "16px", height: "16px", cursor: "pointer", accentColor: "var(--primary)" }}
-                              />
-                            </td>
-                          </tr>
-                        );
-                      })}
+                      {tagihanList.length > 0 ? (
+                        tagihanList.map((item) => {
+                          const isChecked = selectedTagihan.includes(item.id);
+                          return (
+                            <tr key={item.id} style={{ borderBottom: "1px solid var(--border-glass)", backgroundColor: isChecked ? "var(--bg-surface-hover)" : "transparent" }}>
+                              <td style={{ padding: "0.9rem 1rem", fontWeight: 600, color: "var(--text-main)" }}>{item.periode}</td>
+                              <td style={{ padding: "0.9rem 1rem", color: "var(--text-main)" }}>{item.anak}</td>
+                              <td style={{ padding: "0.9rem 1rem", fontWeight: 800, fontSize: "0.95rem", color: "var(--text-main)" }}>
+                                {item.keterangan}
+                              </td>
+                              <td style={{ padding: "0.9rem 1rem", fontWeight: 700, color: "var(--text-main)" }}>
+                                {formatIDR(item.nominal)}
+                              </td>
+                              <td style={{ padding: "0.9rem 1rem" }}>
+                                <StatusBadge status={item.status} />
+                              </td>
+                              <td style={{ padding: "0.9rem 1rem", textAlign: "center" }}>
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  disabled={item.status === "LUNAS" || item.status.includes("MENUNGGU")}
+                                  onChange={() => handleToggleSelect(item.id)}
+                                  style={{ width: "16px", height: "16px", cursor: "pointer", accentColor: "var(--primary)" }}
+                                />
+                              </td>
+                            </tr>
+                          );
+                        })
+                      ) : (
+                        <tr>
+                          <td colSpan={6} style={{ padding: "3rem", textAlign: "center", color: "var(--text-muted)", fontSize: "0.9rem" }}>
+                            Belum ada tagihan terbit untuk anak Anda saat ini.
+                          </td>
+                        </tr>
+                      )}
                     </tbody>
                   </table>
 
@@ -543,55 +508,61 @@ export default function WaliDashboardPage() {
                 </div>
 
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "1.25rem" }}>
-                  {receiptsArchive.map((receipt, idx) => (
-                    <div key={idx} className="glass-card" style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                        <span style={{ fontSize: "0.72rem", fontWeight: 700, color: "var(--text-muted)" }}>
-                          NO: {receipt.receiptNo}
-                        </span>
-                        <span style={{ fontSize: "0.7rem", fontWeight: 800, padding: "0.2rem 0.5rem", borderRadius: "999px", backgroundColor: "var(--status-lunas-bg)", color: "var(--status-lunas)" }}>LUNAS</span>
-                      </div>
-
-                      <h3 style={{ fontSize: "1.1rem", fontWeight: 800, color: "var(--text-main)", marginTop: "0.2rem" }}>Kwitansi Digital</h3>
-
-                      <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem", fontSize: "0.78rem" }}>
-                        <div style={{ display: "flex", justifyContent: "space-between" }}>
-                          <span style={{ color: "var(--text-muted)" }}>Telah terima dari:</span>
-                          <span style={{ fontWeight: 700, color: "var(--text-main)" }}>{receipt.receivedFrom}</span>
+                  {receiptsArchive.length > 0 ? (
+                    receiptsArchive.map((receipt, idx) => (
+                      <div key={idx} className="glass-card" style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <span style={{ fontSize: "0.72rem", fontWeight: 700, color: "var(--text-muted)" }}>
+                            NO: {receipt.receiptNo}
+                          </span>
+                          <span style={{ fontSize: "0.7rem", fontWeight: 800, padding: "0.2rem 0.5rem", borderRadius: "999px", backgroundColor: "var(--status-lunas-bg)", color: "var(--status-lunas)" }}>LUNAS</span>
                         </div>
-                        <div style={{ display: "flex", justifyContent: "space-between" }}>
-                          <span style={{ color: "var(--text-muted)" }}>Sejumlah:</span>
-                          <span style={{ fontWeight: 800, color: "var(--text-main)" }}>{formatIDR(receipt.amount)}</span>
-                        </div>
-                        <div style={{ display: "flex", justifyContent: "space-between" }}>
-                          <span style={{ color: "var(--text-muted)" }}>Untuk pembayaran:</span>
-                          <span style={{ fontWeight: 600, color: "var(--text-main)" }}>{receipt.paymentFor}</span>
-                        </div>
-                      </div>
 
-                      <div style={{ borderTop: "1px solid var(--border-glass)", paddingTop: "0.75rem", marginTop: "0.4rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                        <button
-                          onClick={() => openReceiptModal(receipt)}
-                          style={{
-                            background: "none",
-                            border: "none",
-                            color: "var(--primary)",
-                            fontSize: "0.78rem",
-                            fontWeight: 800,
-                            cursor: "pointer",
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "0.3rem",
-                          }}
-                        >
-                          <Download size={14} /> LIHAT & CETAK
-                        </button>
-                        <span style={{ fontSize: "0.78rem", fontWeight: 800, fontStyle: "italic", color: "var(--text-main)" }}>
-                          {receipt.verifiedBy}
-                        </span>
+                        <h3 style={{ fontSize: "1.1rem", fontWeight: 800, color: "var(--text-main)", marginTop: "0.2rem" }}>Kwitansi Digital</h3>
+
+                        <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem", fontSize: "0.78rem" }}>
+                          <div style={{ display: "flex", justifyContent: "space-between" }}>
+                            <span style={{ color: "var(--text-muted)" }}>Telah terima dari:</span>
+                            <span style={{ fontWeight: 700, color: "var(--text-main)" }}>{receipt.receivedFrom}</span>
+                          </div>
+                          <div style={{ display: "flex", justifyContent: "space-between" }}>
+                            <span style={{ color: "var(--text-muted)" }}>Sejumlah:</span>
+                            <span style={{ fontWeight: 800, color: "var(--text-main)" }}>{formatIDR(receipt.amount)}</span>
+                          </div>
+                          <div style={{ display: "flex", justifyContent: "space-between" }}>
+                            <span style={{ color: "var(--text-muted)" }}>Untuk pembayaran:</span>
+                            <span style={{ fontWeight: 600, color: "var(--text-main)" }}>{receipt.paymentFor}</span>
+                          </div>
+                        </div>
+
+                        <div style={{ borderTop: "1px solid var(--border-glass)", paddingTop: "0.75rem", marginTop: "0.4rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <button
+                            onClick={() => openReceiptModal(receipt)}
+                            style={{
+                              background: "none",
+                              border: "none",
+                              color: "var(--primary)",
+                              fontSize: "0.78rem",
+                              fontWeight: 800,
+                              cursor: "pointer",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "0.3rem",
+                            }}
+                          >
+                            <Download size={14} /> LIHAT & CETAK
+                          </button>
+                          <span style={{ fontSize: "0.78rem", fontWeight: 800, fontStyle: "italic", color: "var(--text-main)" }}>
+                            {receipt.verifiedBy}
+                          </span>
+                        </div>
                       </div>
+                    ))
+                  ) : (
+                    <div className="glass-card" style={{ padding: "2.5rem", textAlign: "center", color: "var(--text-muted)", fontSize: "0.88rem", gridColumn: "1 / -1" }}>
+                      Belum ada kwitansi pembayaran lunas.
                     </div>
-                  ))}
+                  )}
                 </div>
               </section>
             </>
