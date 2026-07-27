@@ -35,12 +35,12 @@ import {
 } from "recharts";
 
 const chartData = [
-  { bulan: "Jul", penerimaan: 12500000, tunggakan: 3200000 },
-  { bulan: "Agu", penerimaan: 15800000, tunggakan: 2800000 },
-  { bulan: "Sep", penerimaan: 14200000, tunggakan: 4100000 },
-  { bulan: "Okt", penerimaan: 18900000, tunggakan: 2100000 },
-  { bulan: "Nov", penerimaan: 16500000, tunggakan: 3500000 },
-  { bulan: "Des", penerimaan: 21000000, tunggakan: 1800000 },
+  { bulan: "Jul", penerimaan: 0, tunggakan: 0 },
+  { bulan: "Agu", penerimaan: 0, tunggakan: 0 },
+  { bulan: "Sep", penerimaan: 0, tunggakan: 0 },
+  { bulan: "Okt", penerimaan: 0, tunggakan: 0 },
+  { bulan: "Nov", penerimaan: 0, tunggakan: 0 },
+  { bulan: "Des", penerimaan: 0, tunggakan: 0 },
 ];
 
 export default function AdminDashboardPage() {
