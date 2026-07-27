@@ -18,7 +18,6 @@ export default async function AdminDashboardPage() {
   let totalTagihanAktif = { _sum: { nominalAkhir: null as any } };
   let berkasMenunggu = 0;
   let totalTunggakan = { _sum: { nominalAkhir: null as any } };
-  let jumlahSiswaTunggakan = 0;
   let riwayatTransaksi: any[] = [];
 
   try {
@@ -36,14 +35,7 @@ export default async function AdminDashboardPage() {
       where: { status: "MENUNGGU_VERIFIKASI_ADMIN" }
     });
 
-    jumlahSiswaTunggakan = await prisma.siswa.count({
-      where: {
-        tagihan: {
-          some: { status: "MENUNGGU_VERIFIKASI_ADMIN" }
-        }
-      }
-    });
-
+    // Query riwayat transaksi
     riwayatTransaksi = await prisma.pembayaran.findMany({
       take: 5,
       orderBy: { createdAt: "desc" },
@@ -68,6 +60,24 @@ export default async function AdminDashboardPage() {
     if (!val) return "0";
     const num = typeof val === "number" ? val : Number(val);
     return isNaN(num) ? "0" : new Intl.NumberFormat("id-ID").format(num);
+  };
+
+  // Helper untuk menentukan label & warna badge berdasarkan status riil
+  const getStatusBadge = (item: any) => {
+    const status = item.tagihan?.status || (item.approvedAt ? "LUNAS" : "MENUNGGU");
+
+    switch (status) {
+      case "LUNAS":
+        return { label: "LUNAS", bg: "#B58A2A" };
+      case "DITOLAK":
+      case "REJECTED":
+        return { label: "DITOLAK", bg: "#C53030" };
+      case "MENUNGGU_VERIFIKASI_ADMIN":
+      case "MENUNGGU_VERIFIKASI_BENDAHARA":
+        return { label: "VERIFIKASI", bg: "#DD6B20" };
+      default:
+        return { label: status.replace(/_/g, " "), bg: "#801212" };
+    }
   };
 
   return (
@@ -226,7 +236,7 @@ export default async function AdminDashboardPage() {
                 <tbody>
                   {Array.isArray(riwayatTransaksi) && riwayatTransaksi.length > 0 ? (
                     riwayatTransaksi.map((item) => {
-                      const isLunas = Boolean(item.approvedAt);
+                      const badge = getStatusBadge(item);
                       return (
                         <tr key={item.id}>
                           <td style={{ padding: "12px", borderBottom: "1px solid #E2E8F0", borderRight: "1px solid #E2E8F0" }}>
@@ -241,8 +251,8 @@ export default async function AdminDashboardPage() {
                             Rp {formatRupiah(item.tagihan?.nominalAkhir)}
                           </td>
                           <td style={{ padding: "12px", borderBottom: "1px solid #E2E8F0" }}>
-                            <span style={{ padding: "2px 8px", fontSize: "9px", fontWeight: 800, letterSpacing: "0.05em", color: "white", textTransform: "uppercase", backgroundColor: isLunas ? "#B58A2A" : "#801212" }}>
-                              {isLunas ? "LUNAS" : "MENUNGGU"}
+                            <span style={{ padding: "2px 8px", fontSize: "9px", fontWeight: 800, letterSpacing: "0.05em", color: "white", textTransform: "uppercase", backgroundColor: badge.bg }}>
+                              {badge.label}
                             </span>
                           </td>
                         </tr>
@@ -266,7 +276,7 @@ export default async function AdminDashboardPage() {
                   KOLEKTIBILITAS BULAN INI
                 </div>
                 <div style={{ width: "128px", height: "128px", borderRadius: "50%", border: "8px solid #EDF2F7", borderTopColor: "#1B4332", borderRightColor: "#1B4332", borderBottomColor: "#1B4332", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", margin: "24px auto" }}>
-                  <span style={{ fontSize: "24px", fontWeight: 900, fontFamily: "monospace" }}>75%</span>
+                  <span style={{ fontSize: "24px", fontWeight: 900, fontFamily: "monospace" }}>-</span>
                   <span style={{ fontSize: "9px", color: "#A0AEC0", fontWeight: "bold" }}>TERCAPAI</span>
                 </div>
               </div>
