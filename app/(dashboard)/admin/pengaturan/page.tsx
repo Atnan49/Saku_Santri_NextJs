@@ -6,12 +6,14 @@
 //            Otomatis, Master Jenis Tagihan, Tahun Ajaran, dan Rekening Bank.
 // =========================================================================
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import SidebarNav from "@/components/ui/SidebarNav";
 import TopHeader from "@/components/ui/TopHeader";
 import GlassCard from "@/components/ui/GlassCard";
 import SegmentedControl from "@/components/ui/SegmentedControl";
 import { formatIDR } from "@/lib/utils";
+import { getTahunAjaranList, createTahunAjaran, setActiveTahunAjaran } from "@/lib/actions/tahun-ajaran";
+import { getJenisTagihanList, createJenisTagihan } from "@/lib/actions/jenis-tagihan";
 import {
   Settings,
   Calendar,
@@ -23,10 +25,12 @@ import {
   Sparkles,
   Layers,
   CalendarDays,
+  Loader2,
 } from "lucide-react";
 
 export default function AdminPengaturanPage() {
   const [activeTab, setActiveTab] = useState("Konfigurasi SPP");
+  const [loading, setLoading] = useState(true);
 
   // Form State SPP Auto Generate
   const [nominalSPP, setNominalSPP] = useState("250000");
@@ -34,21 +38,16 @@ export default function AdminPengaturanPage() {
   const [sppSavedAlert, setSppSavedAlert] = useState(false);
 
   // Form State Tahun Ajaran
-  const [tahunAjaran, setTahunAjaran] = useState("2025/2026");
-  const [tahunList, setTahunList] = useState([
-    { id: "1", year: "2025/2026", isActive: true },
-    { id: "2", year: "2024/2025", isActive: false },
-  ]);
+  const [tahunAjaran, setTahunAjaran] = useState("");
+  const [tahunList, setTahunList] = useState<any[]>([]);
+  const [savingTahun, setSavingTahun] = useState(false);
 
   // Form State Jenis Tagihan
   const [jenisNama, setJenisNama] = useState("");
   const [jenisNominal, setJenisNominal] = useState("");
-  const [jenisType, setJenisType] = useState("BULANAN");
-  const [jenisList, setJenisList] = useState([
-    { id: "1", name: "SPP Bulanan Standar", type: "BULANAN", nominal: 250000 },
-    { id: "2", name: "Uang Gedung", type: "TAHUNAN", nominal: 1000000 },
-    { id: "3", name: "Buku & Seragam", type: "TAHUNAN", nominal: 500000 },
-  ]);
+  const [jenisType, setJenisType] = useState<"BULANAN" | "TAHUNAN">("BULANAN");
+  const [jenisList, setJenisList] = useState<any[]>([]);
+  const [savingJenis, setSavingJenis] = useState(false);
 
   // Form State Rekening Bank
   const [bankBca, setBankBca] = useState("1234567890");
@@ -56,10 +55,46 @@ export default function AdminPengaturanPage() {
   const [atasNama, setAtasNama] = useState("Yayasan Pondok Pesantren");
   const [bankSavedAlert, setBankSavedAlert] = useState(false);
 
-  const handleSaveSPP = (e: React.FormEvent) => {
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const [tData, jData] = await Promise.all([getTahunAjaranList(), getJenisTagihanList()]);
+      setTahunList(tData);
+      setJenisList(jData);
+
+      // Cari nominal SPP dari master jika ada
+      const sppMaster = jData.find((j: any) => j.type === "BULANAN");
+      if (sppMaster) {
+        setNominalSPP(String(sppMaster.nominal));
+      }
+    } catch (err) {
+      console.error("Gagal memuat pengaturan:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const handleSaveSPP = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSppSavedAlert(true);
-    setTimeout(() => setSppSavedAlert(false), 2000);
+    try {
+      const sppMaster = jenisList.find((j: any) => j.type === "BULANAN");
+      if (!sppMaster) {
+        await createJenisTagihan({
+          name: "SPP Bulanan Standar",
+          type: "BULANAN",
+          nominal: Number(nominalSPP),
+        });
+      }
+      setSppSavedAlert(true);
+      await loadData();
+      setTimeout(() => setSppSavedAlert(false), 2000);
+    } catch (err: any) {
+      alert(err.message || "Gagal menyimpan konfigurasi SPP.");
+    }
   };
 
   const handleSaveBank = (e: React.FormEvent) => {
@@ -68,22 +103,48 @@ export default function AdminPengaturanPage() {
     setTimeout(() => setBankSavedAlert(false), 2000);
   };
 
-  const handleAddTahun = (e: React.FormEvent) => {
+  const handleAddTahun = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!tahunAjaran) return;
-    setTahunList([{ id: String(Date.now()), year: tahunAjaran, isActive: false }, ...tahunList]);
-    setTahunAjaran("");
+    setSavingTahun(true);
+    try {
+      await createTahunAjaran(tahunAjaran.trim());
+      setTahunAjaran("");
+      await loadData();
+    } catch (err: any) {
+      alert(err.message || "Gagal menambah tahun ajaran.");
+    } finally {
+      setSavingTahun(false);
+    }
   };
 
-  const handleAddJenis = (e: React.FormEvent) => {
+  const handleSetActiveTahun = async (id: string) => {
+    try {
+      await setActiveTahunAjaran(id);
+      await loadData();
+    } catch (err: any) {
+      alert(err.message || "Gagal mengaktifkan tahun ajaran.");
+    }
+  };
+
+  const handleAddJenis = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!jenisNama || !jenisNominal) return;
-    setJenisList([
-      { id: String(Date.now()), name: jenisNama, type: jenisType, nominal: Number(jenisNominal) },
-      ...jenisList,
-    ]);
-    setJenisNama("");
-    setJenisNominal("");
+    setSavingJenis(true);
+    try {
+      await createJenisTagihan({
+        name: jenisNama.trim(),
+        type: jenisType,
+        nominal: Number(jenisNominal),
+      });
+      setJenisNama("");
+      setJenisNominal("");
+      await loadData();
+    } catch (err: any) {
+      alert(err.message || "Gagal menambah jenis tagihan.");
+    } finally {
+      setSavingJenis(false);
+    }
   };
 
   return (
@@ -219,7 +280,7 @@ export default function AdminPengaturanPage() {
                         <span style={{ fontSize: "0.75rem", fontWeight: 800, color: "var(--status-lunas)", backgroundColor: "var(--status-lunas-bg)", padding: "0.25rem 0.6rem", borderRadius: "999px" }}>AKTIF</span>
                       ) : (
                         <button
-                          onClick={() => setTahunList(tahunList.map((x) => ({ ...x, isActive: x.id === t.id })))}
+                          onClick={() => handleSetActiveTahun(t.id)}
                           style={{ fontSize: "0.75rem", fontWeight: 700, padding: "0.25rem 0.6rem", border: "1px solid var(--border-glass)", borderRadius: "4px", background: "none", cursor: "pointer" }}
                         >
                           Aktifkan

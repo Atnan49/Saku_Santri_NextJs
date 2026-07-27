@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import SidebarNav from "@/components/ui/SidebarNav";
 import TopHeader from "@/components/ui/TopHeader";
 import DigitalReceiptModal, { DigitalReceiptData } from "@/components/ui/DigitalReceiptModal";
 import { formatIDR } from "@/lib/utils";
+import { getPembayaranForAdminVerification, adminVerifyPayment } from "@/lib/actions/pembayaran";
 import {
   CheckCircle2,
   Search,
@@ -13,7 +14,8 @@ import {
   FileCheck2,
   AlertTriangle,
   ArrowRightLeft,
-  X
+  X,
+  Loader2,
 } from "lucide-react";
 
 interface VerificationItem {
@@ -36,9 +38,10 @@ interface VerificationItem {
 }
 
 export default function AdminVerifikasiPage() {
+  const [loading, setLoading] = useState(true);
   const [queueList, setQueueList] = useState<Array<VerificationItem>>([]);
 
-  const [selectedId, setSelectedId] = useState<string>("VER-001");
+  const [selectedId, setSelectedId] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState("");
   const [fullImageModalOpen, setFullImageModalOpen] = useState(false);
   const [rejectionModalOpen, setRejectionModalOpen] = useState(false);
@@ -46,6 +49,42 @@ export default function AdminVerifikasiPage() {
 
   const [receiptModalOpen, setReceiptModalOpen] = useState(false);
   const [generatedReceiptData, setGeneratedReceiptData] = useState<DigitalReceiptData | null>(null);
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const raw = await getPembayaranForAdminVerification();
+      const mapped: VerificationItem[] = raw.map((p: any) => ({
+        id: p.id,
+        refNo: `REF-${p.id.slice(-6).toUpperCase()}`,
+        reportDate: new Date(p.createdAt).toISOString().split("T")[0],
+        studentName: p.tagihan?.siswa?.name || "Santri",
+        studentClass: p.tagihan?.siswa?.kelas?.name || "-",
+        parentName: p.tagihan?.siswa?.wali?.user?.name || "Wali Santri",
+        category: p.tagihan?.jenisTagihan?.name || "SPP Bulanan",
+        dateTimeStr: new Date(p.createdAt).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" }),
+        originalAmount: Number(p.tagihan?.nominalAwal) || 0,
+        expectedAmount: Number(p.tagihan?.nominalAkhir) || 0,
+        reportedAmount: Number(p.amountPaid) || 0,
+        hasScholarship: Number(p.tagihan?.potongan) > 0,
+        paymentMethod: p.paymentMethod || "Bank Transfer",
+        proofImageUrl: p.proofUrl || "",
+        status: p.status === "VERIFIED_TU" ? "LUNAS" : p.status === "REJECTED" ? "DITOLAK" : "PENDING",
+      }));
+      setQueueList(mapped);
+      if (mapped.length > 0 && !selectedId) {
+        setSelectedId(mapped[0].id);
+      }
+    } catch (err) {
+      console.error("Gagal memuat verifikasi admin:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
 
   const selectedItem = queueList.find((q) => q.id === selectedId) || queueList[0];
 
@@ -60,45 +99,45 @@ export default function AdminVerifikasiPage() {
     .filter((q) => q.status === "PENDING")
     .reduce((sum, q) => sum + q.reportedAmount, 0);
 
-  const handleApprove = () => {
+  const handleApprove = async () => {
     if (!selectedItem) return;
+    try {
+      await adminVerifyPayment(selectedItem.id, true);
 
-    setQueueList((prev) =>
-      prev.map((q) => (q.id === selectedItem.id ? { ...q, status: "LUNAS" } : q))
-    );
+      const receiptData: DigitalReceiptData = {
+        receiptNo: `KW-${selectedItem.refNo.replace("REF-", "")}`,
+        date: new Date().toISOString().split("T")[0],
+        receivedFrom: selectedItem.parentName,
+        studentName: selectedItem.studentName,
+        studentClass: selectedItem.studentClass,
+        amount: selectedItem.reportedAmount,
+        paymentFor: selectedItem.category,
+        verifiedBy: "Admin Utama",
+        paymentMethod: selectedItem.paymentMethod,
+      };
 
-    const receiptData: DigitalReceiptData = {
-      receiptNo: `KW-${selectedItem.refNo.replace("REF-", "")}`,
-      date: new Date().toISOString().split("T")[0],
-      receivedFrom: selectedItem.parentName,
-      studentName: selectedItem.studentName,
-      studentClass: selectedItem.studentClass,
-      amount: selectedItem.reportedAmount,
-      paymentFor: selectedItem.category,
-      verifiedBy: "Admin Utama",
-      paymentMethod: selectedItem.paymentMethod,
-    };
-
-    setGeneratedReceiptData(receiptData);
-    setReceiptModalOpen(true);
+      setGeneratedReceiptData(receiptData);
+      setReceiptModalOpen(true);
+      await loadData();
+    } catch (err: any) {
+      alert(err.message || "Gagal memverifikasi pembayaran.");
+    }
   };
 
-  const handleConfirmRejection = () => {
+  const handleConfirmRejection = async () => {
     if (!rejectionReason.trim()) {
       alert("Mohon masukkan alasan penolakan.");
       return;
     }
 
-    setQueueList((prev) =>
-      prev.map((q) =>
-        q.id === selectedItem.id
-          ? { ...q, status: "DITOLAK", rejectionReason: rejectionReason }
-          : q
-      )
-    );
-
-    setRejectionModalOpen(false);
-    setRejectionReason("");
+    try {
+      await adminVerifyPayment(selectedItem.id, false, rejectionReason.trim());
+      setRejectionModalOpen(false);
+      setRejectionReason("");
+      await loadData();
+    } catch (err: any) {
+      alert(err.message || "Gagal menolak verifikasi.");
+    }
   };
 
   return (

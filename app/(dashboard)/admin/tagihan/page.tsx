@@ -5,11 +5,15 @@
 // Deskripsi: Halaman generator tagihan (Bulanan & Tahunan).
 // =========================================================================
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import SidebarNav from "@/components/ui/SidebarNav";
 import TopHeader from "@/components/ui/TopHeader";
 import GlassCard from "@/components/ui/GlassCard";
 import { formatIDR } from "@/lib/utils";
+import { generateMonthlyBills, createManualBill } from "@/lib/actions/tagihan";
+import { getTahunAjaranList, getActiveTahunAjaran, createTahunAjaran } from "@/lib/actions/tahun-ajaran";
+import { getJenisTagihanList, createJenisTagihan } from "@/lib/actions/jenis-tagihan";
+import { getSantriList } from "@/lib/actions/santri";
 import {
   Receipt,
   Calendar,
@@ -25,37 +29,132 @@ export default function AdminTagihanPage() {
   const [loadingSPP, setLoadingSPP] = useState(false);
   const [loadingManual, setLoadingManual] = useState(false);
   const [sppSuccess, setSppSuccess] = useState(false);
+  const [sppMessage, setSppMessage] = useState("");
   const [manualSuccess, setManualSuccess] = useState(false);
+  const [manualMessage, setManualMessage] = useState("");
 
   // Form State
-  const [bulan, setBulan] = useState("2026-07");
+  const [bulan, setBulan] = useState(new Date().toISOString().slice(0, 7));
   const [namaTagihan, setNamaTagihan] = useState("");
   const [nominal, setNominal] = useState("");
   const [targetKelas, setTargetKelas] = useState("SEMUA");
 
-  const handleGenerateSPP = (e: React.FormEvent) => {
+  const [activeTahun, setActiveTahun] = useState<any>(null);
+  const [jenisSPP, setJenisSPP] = useState<any>(null);
+  const [santriList, setSantriList] = useState<any[]>([]);
+
+  useEffect(() => {
+    async function initData() {
+      try {
+        const [tActive, jList, sList] = await Promise.all([
+          getActiveTahunAjaran(),
+          getJenisTagihanList(),
+          getSantriList(),
+        ]);
+
+        setActiveTahun(tActive);
+        setSantriList(sList);
+
+        const spp = jList.find((j: any) => j.type === "BULANAN");
+        setJenisSPP(spp);
+      } catch (err) {
+        console.error("Gagal memuat data pendukung tagihan:", err);
+      }
+    }
+    initData();
+  }, []);
+
+  const handleGenerateSPP = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoadingSPP(true);
     setSppSuccess(false);
 
-    setTimeout(() => {
-      setLoadingSPP(false);
+    try {
+      let tId = activeTahun?.id;
+      if (!tId) {
+        const tNew = await createTahunAjaran("2025/2026");
+        tId = tNew.id;
+      }
+
+      let jId = jenisSPP?.id;
+      if (!jId) {
+        const jNew = await createJenisTagihan({
+          name: "SPP Bulanan Standar",
+          type: "BULANAN",
+          nominal: 250000,
+        });
+        jId = jNew.id;
+      }
+
+      // Hitung tanggal jatuh tempo (tanggal 10 bulan tersebut)
+      const dueDateStr = `${bulan}-10T23:59:59.000Z`;
+
+      const res = await generateMonthlyBills({
+        jenisTagihanId: jId,
+        tahunAjaranId: tId,
+        period: bulan,
+        dueDate: dueDateStr,
+      });
+
+      setSppMessage(res.message);
       setSppSuccess(true);
-    }, 1200);
+    } catch (err: any) {
+      alert(err.message || "Gagal menerbitkan tagihan SPP.");
+    } finally {
+      setLoadingSPP(false);
+    }
   };
 
-  const handleBuatManual = (e: React.FormEvent) => {
+  const handleBuatManual = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!namaTagihan || !nominal) return;
     setLoadingManual(true);
     setManualSuccess(false);
 
-    setTimeout(() => {
-      setLoadingManual(false);
+    try {
+      let tId = activeTahun?.id;
+      if (!tId) {
+        const tNew = await createTahunAjaran("2025/2026");
+        tId = tNew.id;
+      }
+
+      // 1. Buat Jenis Tagihan Manual
+      const jManual = await createJenisTagihan({
+        name: namaTagihan.trim(),
+        type: "TAHUNAN",
+        nominal: Number(nominal),
+      });
+
+      // 2. Filter siswa sasaran
+      const targetSiswa = targetKelas === "SEMUA"
+        ? santriList
+        : santriList.filter((s: any) => s.kelas?.name === targetKelas);
+
+      if (targetSiswa.length === 0) {
+        throw new Error("Tidak ada santri pada sasaran kelas yang dipilih.");
+      }
+
+      const sIds = targetSiswa.map((s: any) => s.id);
+      const dueDateStr = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+
+      const res = await createManualBill({
+        siswaIds: sIds,
+        jenisTagihanId: jManual.id,
+        tahunAjaranId: tId,
+        nominalAwal: Number(nominal),
+        dueDate: dueDateStr,
+        catatanTagihan: `Tagihan kegiatan ${namaTagihan.trim()}`,
+      });
+
+      setManualMessage(res.message);
       setManualSuccess(true);
       setNamaTagihan("");
       setNominal("");
-    }, 1200);
+    } catch (err: any) {
+      alert(err.message || "Gagal membuat tagihan manual.");
+    } finally {
+      setLoadingManual(false);
+    }
   };
 
   return (
@@ -97,7 +196,7 @@ export default function AdminTagihanPage() {
               {sppSuccess && (
                 <div style={{ backgroundColor: "var(--status-lunas-bg)", border: "1px solid var(--status-lunas)", borderRadius: "6px", padding: "0.75rem 1rem", color: "var(--status-lunas)", fontSize: "0.85rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
                   <CheckCircle2 size={18} />
-                  <span>Berhasil menerbitkan tagihan SPP bulanan untuk seluruh santri!</span>
+                  <span>{sppMessage || "Berhasil menerbitkan tagihan SPP bulanan untuk seluruh santri!"}</span>
                 </div>
               )}
 
@@ -160,7 +259,7 @@ export default function AdminTagihanPage() {
               {manualSuccess && (
                 <div style={{ backgroundColor: "var(--status-lunas-bg)", border: "1px solid var(--status-lunas)", borderRadius: "6px", padding: "0.75rem 1rem", color: "var(--status-lunas)", fontSize: "0.85rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
                   <CheckCircle2 size={18} />
-                  <span>Berhasil menerbitkan tagihan manual baru!</span>
+                  <span>{manualMessage || "Berhasil menerbitkan tagihan manual baru!"}</span>
                 </div>
               )}
 

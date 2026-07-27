@@ -5,12 +5,13 @@
 // Deskripsi: Halaman antrean approval pembayaran Tahap 2 (Final).
 // =========================================================================
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import SidebarNav from "@/components/ui/SidebarNav";
 import TopHeader from "@/components/ui/TopHeader";
 import GlassCard from "@/components/ui/GlassCard";
 import DigitalReceiptModal, { DigitalReceiptData } from "@/components/ui/DigitalReceiptModal";
 import { formatIDR } from "@/lib/utils";
+import { getPembayaranForBendaharaApproval, bendaharaApprovePayment } from "@/lib/actions/pembayaran";
 import {
   CheckCircle2,
   XCircle,
@@ -18,29 +19,52 @@ import {
   ShieldCheck,
   Search,
   Eye,
+  Loader2,
 } from "lucide-react";
 
 export default function BendaharaApprovalPage() {
+  const [loading, setLoading] = useState(true);
   const [approvalList, setApprovalList] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [receiptModalOpen, setReceiptModalOpen] = useState(false);
   const [receiptData, setReceiptData] = useState<DigitalReceiptData | null>(null);
 
-  const handleApprove = (item: any) => {
-    setApprovalList(approvalList.filter((x) => x.id !== item.id));
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const data = await getPembayaranForBendaharaApproval();
+      setApprovalList(data);
+    } catch (err) {
+      console.error("Gagal memuat antrean approval bendahara:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    setReceiptData({
-      receiptNo: `KW-${Date.now().toString().slice(-6)}`,
-      date: new Date().toISOString().split("T")[0],
-      receivedFrom: item.waliName || "Wali Santri",
-      studentName: item.studentName || "Ahmad Santri",
-      studentClass: item.studentClass || "Kelas 7A",
-      amount: item.nominal || 250000,
-      paymentFor: item.tagihan || "SPP Bulanan",
-      verifiedBy: "Bendahara Pesantren",
-      paymentMethod: "Bank Transfer",
-    });
-    setReceiptModalOpen(true);
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const handleApprove = async (item: any) => {
+    try {
+      const res = await bendaharaApprovePayment(item.id);
+
+      setReceiptData({
+        receiptNo: res.nomorKwitansi || `KW-${Date.now().toString().slice(-6)}`,
+        date: new Date().toISOString().split("T")[0],
+        receivedFrom: item.tagihan?.siswa?.wali?.user?.name || "Wali Santri",
+        studentName: item.tagihan?.siswa?.name || "Santri",
+        studentClass: item.tagihan?.siswa?.kelas?.name || "-",
+        amount: Number(item.amountPaid) || 250000,
+        paymentFor: item.tagihan?.jenisTagihan?.name || "SPP Bulanan",
+        verifiedBy: "Bendahara Pesantren",
+        paymentMethod: item.paymentMethod || "Bank Transfer",
+      });
+      setReceiptModalOpen(true);
+      await loadData();
+    } catch (err: any) {
+      alert(err.message || "Gagal melakukan persetujuan pembayaran.");
+    }
   };
 
   return (
@@ -77,11 +101,11 @@ export default function BendaharaApprovalPage() {
                   approvalList.map((item) => (
                     <tr key={item.id} style={{ borderBottom: "1px solid var(--border-glass)" }}>
                       <td style={{ padding: "0.9rem 1rem", fontWeight: 700, color: "var(--text-main)" }}>
-                        <div>{item.studentName}</div>
-                        <div style={{ fontSize: "0.75rem", color: "var(--text-dim)" }}>{item.studentClass}</div>
+                        <div>{item.tagihan?.siswa?.name || item.studentName}</div>
+                        <div style={{ fontSize: "0.75rem", color: "var(--text-dim)" }}>{item.tagihan?.siswa?.kelas?.name || item.studentClass}</div>
                       </td>
-                      <td style={{ padding: "0.9rem 1rem", color: "var(--text-main)" }}>{item.tagihan}</td>
-                      <td style={{ padding: "0.9rem 1rem", fontWeight: 800, color: "var(--primary)" }}>{formatIDR(item.nominal)}</td>
+                      <td style={{ padding: "0.9rem 1rem", color: "var(--text-main)" }}>{item.tagihan?.jenisTagihan?.name || item.tagihan}</td>
+                      <td style={{ padding: "0.9rem 1rem", fontWeight: 800, color: "var(--primary)" }}>{formatIDR(Number(item.amountPaid) || item.nominal || 0)}</td>
                       <td style={{ padding: "0.9rem 1rem", color: "var(--status-lunas)" }}>✓ Admin TU</td>
                       <td style={{ padding: "0.9rem 1rem", textAlign: "center" }}>
                         <button

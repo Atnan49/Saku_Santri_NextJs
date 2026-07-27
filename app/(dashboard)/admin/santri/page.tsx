@@ -10,6 +10,9 @@ import SidebarNav from "@/components/ui/SidebarNav";
 import TopHeader from "@/components/ui/TopHeader";
 import GlassCard from "@/components/ui/GlassCard";
 import { formatIDR } from "@/lib/utils";
+import { getSantriList, createSantri, deleteSantri } from "@/lib/actions/santri";
+import { getKelasList, createKelas } from "@/lib/actions/kelas";
+import { createWaliMuridUser } from "@/lib/actions/user";
 import {
   Users,
   UserPlus,
@@ -25,10 +28,13 @@ import {
 } from "lucide-react";
 
 export default function AdminSantriPage() {
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [santriList, setSantriList] = useState<any[]>([]);
+  const [kelasList, setKelasList] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
 
   // Form State
   const [nisn, setNisn] = useState("");
@@ -38,33 +44,83 @@ export default function AdminSantriPage() {
   const [noHpWali, setNoHpWali] = useState("");
   const [potongan, setPotongan] = useState("0");
 
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const [sData, kData] = await Promise.all([getSantriList(), getKelasList()]);
+      setSantriList(sData);
+      setKelasList(kData);
+    } catch (err) {
+      console.error("Gagal memuat data santri:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
   const filteredSantri = santriList.filter(
     (s) =>
       s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       s.nisn.includes(searchQuery)
   );
 
-  const handleAddSantri = (e: React.FormEvent) => {
+  const handleAddSantri = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!nama || !nisn) return;
+    setSaving(true);
+    setErrorMessage("");
 
-    const newSantri = {
-      id: String(Date.now()),
-      nisn,
-      name: nama,
-      kelas: { name: kelas },
-      wali: { user: { name: namaWali || "Wali " + nama, phone: noHpWali || "08123456789" } },
-      potonganTetap: Number(potongan) || 0,
-    };
+    try {
+      // 1. Cari atau buat Kelas
+      let selectedKelas = kelasList.find((k) => k.name.toLowerCase() === kelas.trim().toLowerCase());
+      if (!selectedKelas) {
+        selectedKelas = await createKelas(kelas.trim());
+      }
 
-    setSantriList([newSantri, ...santriList]);
-    setIsAddModalOpen(false);
-    // Reset Form
-    setNisn("");
-    setNama("");
-    setNamaWali("");
-    setNoHpWali("");
-    setPotongan("0");
+      // 2. Buat User Wali Murid
+      const phoneClean = noHpWali.trim() || `08${Date.now().toString().slice(-9)}`;
+      const waliRes = await createWaliMuridUser({
+        phone: phoneClean,
+        name: namaWali.trim() || `Wali ${nama.trim()}`,
+        password: "wali123",
+      });
+
+      // 3. Buat Santri
+      await createSantri({
+        nisn: nisn.trim(),
+        name: nama.trim(),
+        kelasId: selectedKelas.id,
+        waliId: waliRes.waliId!,
+        potonganTetap: Number(potongan) || 0,
+      });
+
+      setIsAddModalOpen(false);
+      // Reset Form
+      setNisn("");
+      setNama("");
+      setNamaWali("");
+      setNoHpWali("");
+      setPotongan("0");
+
+      await loadData();
+    } catch (err: any) {
+      setErrorMessage(err.message || "Gagal menyimpan data santri.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteSantri = async (id: string) => {
+    if (!confirm("Apakah Anda yakin ingin menghapus data santri ini?")) return;
+    try {
+      await deleteSantri(id);
+      await loadData();
+    } catch (err: any) {
+      alert(err.message || "Gagal menghapus santri.");
+    }
   };
 
   return (
@@ -167,7 +223,7 @@ export default function AdminSantriPage() {
                       </td>
                       <td style={{ padding: "0.9rem 1rem", textAlign: "center" }}>
                         <button
-                          onClick={() => setSantriList(santriList.filter((x) => x.id !== s.id))}
+                          onClick={() => handleDeleteSantri(s.id)}
                           style={{
                             padding: "0.35rem 0.6rem",
                             fontSize: "0.75rem",
@@ -291,6 +347,12 @@ export default function AdminSantriPage() {
                 </div>
               </div>
 
+              {errorMessage && (
+                <div style={{ backgroundColor: "var(--status-ditolak-bg)", border: "1px solid var(--status-ditolak)", borderRadius: "4px", padding: "0.6rem 0.85rem", fontSize: "0.82rem", color: "var(--status-ditolak)" }}>
+                  {errorMessage}
+                </div>
+              )}
+
               <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem", marginTop: "1rem" }}>
                 <button
                   type="button"
@@ -301,9 +363,11 @@ export default function AdminSantriPage() {
                 </button>
                 <button
                   type="submit"
-                  style={{ padding: "0.6rem 1.25rem", border: "none", borderRadius: "4px", backgroundColor: "var(--primary)", color: "#fff", fontWeight: 700, cursor: "pointer" }}
+                  disabled={saving}
+                  style={{ padding: "0.6rem 1.25rem", border: "none", borderRadius: "4px", backgroundColor: "var(--primary)", color: "#fff", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: "0.4rem" }}
                 >
-                  Simpan Santri
+                  {saving && <Loader2 className="animate-spin" size={16} />}
+                  {saving ? "Memproses..." : "Simpan Santri"}
                 </button>
               </div>
             </form>
