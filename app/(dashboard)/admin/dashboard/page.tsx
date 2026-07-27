@@ -63,18 +63,26 @@ export default async function AdminDashboardPage() {
   };
 
   // Helper untuk menentukan label & warna badge berdasarkan status riil
+// Helper untuk menentukan label & warna badge berdasarkan Enum TagihanStatus yang presisi
   const getStatusBadge = (item: any) => {
-    const status = item.tagihan?.status || (item.approvedAt ? "LUNAS" : "MENUNGGU");
+    const status = item.tagihan?.status || (item.approvedAt ? "LUNAS" : "BELUM_BAYAR");
 
     switch (status) {
       case "LUNAS":
         return { label: "LUNAS", bg: "#B58A2A" };
+        
+      case "DITOLAK_ADMIN":
+      case "DITOLAK_BENDAHARA":
       case "DITOLAK":
       case "REJECTED":
         return { label: "DITOLAK", bg: "#C53030" };
+
       case "MENUNGGU_VERIFIKASI_ADMIN":
+      case "MENUNGGU_APPROVAL_BENDAHARA":
       case "MENUNGGU_VERIFIKASI_BENDAHARA":
         return { label: "VERIFIKASI", bg: "#DD6B20" };
+
+      case "BELUM_BAYAR":
       default:
         return { label: status.replace(/_/g, " "), bg: "#801212" };
     }
