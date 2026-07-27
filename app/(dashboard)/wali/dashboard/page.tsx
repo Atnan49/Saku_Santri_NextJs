@@ -607,15 +607,3 @@ export default function WaliDashboardPage() {
     </div>
   );
 }
-
-        </div>
-      </main>
-
-      <DigitalReceiptModal
-        isOpen={receiptModalOpen}
-        onClose={() => setReceiptModalOpen(false)}
-        data={selectedReceipt}
-      />
-    </div>
-  );
-}
