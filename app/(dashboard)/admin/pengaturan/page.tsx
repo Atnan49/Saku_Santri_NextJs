@@ -2,8 +2,8 @@
 
 // =========================================================================
 // TANGGUNG JAWAB: Usva (Frontend) & Atnan (Backend/Logic)
-// Deskripsi: Halaman pengaturan sistem untuk mengelola Tahun Ajaran,
-//            Jenis Tagihan, dan Manajemen User.
+// Deskripsi: Halaman pengaturan sistem untuk mengelola Konfigurasi SPP Bulanan
+//            Otomatis, Master Jenis Tagihan, Tahun Ajaran, dan Rekening Bank.
 // =========================================================================
 
 import React, { useState } from "react";
@@ -11,19 +11,27 @@ import SidebarNav from "@/components/ui/SidebarNav";
 import TopHeader from "@/components/ui/TopHeader";
 import GlassCard from "@/components/ui/GlassCard";
 import SegmentedControl from "@/components/ui/SegmentedControl";
+import { formatIDR } from "@/lib/utils";
 import {
   Settings,
   Calendar,
-  Tag,
-  Users,
-  Plus,
+  Receipt,
+  Building2,
   CheckCircle2,
-  Lock,
   Save,
+  CreditCard,
+  Sparkles,
+  Layers,
+  CalendarDays,
 } from "lucide-react";
 
 export default function AdminPengaturanPage() {
-  const [activeTab, setActiveTab] = useState("Tahun Ajaran");
+  const [activeTab, setActiveTab] = useState("Konfigurasi SPP");
+
+  // Form State SPP Auto Generate
+  const [nominalSPP, setNominalSPP] = useState("250000");
+  const [dueDateDay, setDueDateDay] = useState("10");
+  const [sppSavedAlert, setSppSavedAlert] = useState(false);
 
   // Form State Tahun Ajaran
   const [tahunAjaran, setTahunAjaran] = useState("2025/2026");
@@ -37,9 +45,28 @@ export default function AdminPengaturanPage() {
   const [jenisNominal, setJenisNominal] = useState("");
   const [jenisType, setJenisType] = useState("BULANAN");
   const [jenisList, setJenisList] = useState([
-    { id: "1", name: "SPP Bulanan", type: "BULANAN", nominal: 250000 },
+    { id: "1", name: "SPP Bulanan Standar", type: "BULANAN", nominal: 250000 },
     { id: "2", name: "Uang Gedung", type: "TAHUNAN", nominal: 1000000 },
+    { id: "3", name: "Buku & Seragam", type: "TAHUNAN", nominal: 500000 },
   ]);
+
+  // Form State Rekening Bank
+  const [bankBca, setBankBca] = useState("1234567890");
+  const [bankBsi, setBankBsi] = useState("7700123456");
+  const [atasNama, setAtasNama] = useState("Yayasan Pondok Pesantren");
+  const [bankSavedAlert, setBankSavedAlert] = useState(false);
+
+  const handleSaveSPP = (e: React.FormEvent) => {
+    e.preventDefault();
+    setSppSavedAlert(true);
+    setTimeout(() => setSppSavedAlert(false), 2000);
+  };
+
+  const handleSaveBank = (e: React.FormEvent) => {
+    e.preventDefault();
+    setBankSavedAlert(true);
+    setTimeout(() => setBankSavedAlert(false), 2000);
+  };
 
   const handleAddTahun = (e: React.FormEvent) => {
     e.preventDefault();
@@ -73,20 +100,89 @@ export default function AdminPengaturanPage() {
               KONFIGURASI PUSAT
             </div>
             <h1 style={{ fontSize: "1.75rem", fontWeight: 800, color: "var(--text-main)", marginTop: "0.2rem" }}>
-              Pengaturan Sistem & Master Data
+              Pengaturan Sistem & Parameter Keuangan
             </h1>
           </div>
 
           {/* Segmented Control Tabs */}
-          <div style={{ maxWidth: "500px" }}>
+          <div style={{ maxWidth: "600px" }}>
             <SegmentedControl
-              options={["Tahun Ajaran", "Jenis Tagihan"]}
+              options={["Konfigurasi SPP", "Tahun Ajaran", "Master Tagihan", "Rekening Bank"]}
               selectedValue={activeTab}
               onChange={(val) => setActiveTab(val)}
             />
           </div>
 
-          {/* TAB 1: TAHUN AJARAN */}
+          {/* TAB 1: KONFIGURASI SPP BULANAN OTOMATIS */}
+          {activeTab === "Konfigurasi SPP" && (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(420px, 1fr))", gap: "1.5rem" }}>
+              <GlassCard style={{ display: "flex", flexDirection: "column", gap: "1.25rem", padding: "1.5rem" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", borderBottom: "1px solid var(--border-glass)", paddingBottom: "0.75rem" }}>
+                  <div style={{ padding: "0.5rem", borderRadius: "8px", backgroundColor: "var(--primary-light)", color: "var(--primary)" }}>
+                    <Sparkles size={22} />
+                  </div>
+                  <div>
+                    <h3 style={{ fontSize: "1.1rem", fontWeight: 800, color: "var(--text-main)" }}>
+                      Parameter Generator SPP Otomatis
+                    </h3>
+                    <p style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>
+                      Atur acuan dasar nominal SPP dan jatuh tempo untuk penerbitan bulanan.
+                    </p>
+                  </div>
+                </div>
+
+                {sppSavedAlert && (
+                  <div style={{ backgroundColor: "var(--status-lunas-bg)", border: "1px solid var(--status-lunas)", borderRadius: "6px", padding: "0.75rem 1rem", color: "var(--status-lunas)", fontSize: "0.85rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                    <CheckCircle2 size={18} />
+                    <span>Konfigurasi SPP Bulanan berhasil diperbarui!</span>
+                  </div>
+                )}
+
+                <form onSubmit={handleSaveSPP} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                  <div>
+                    <label style={{ fontSize: "0.75rem", fontWeight: 800, textTransform: "uppercase", color: "var(--text-muted)" }}>Nominal Standar SPP Bulanan (Rp)</label>
+                    <input
+                      type="number"
+                      required
+                      placeholder="250000"
+                      value={nominalSPP}
+                      onChange={(e) => setNominalSPP(e.target.value)}
+                      style={{ width: "100%", padding: "0.65rem 0.85rem", border: "1px solid var(--border-glass)", borderRadius: "6px", backgroundColor: "var(--bg-app)", fontSize: "0.9rem", marginTop: "0.2rem" }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: "0.75rem", fontWeight: 800, textTransform: "uppercase", color: "var(--text-muted)" }}>Batas Tanggal Jatuh Tempo Setiap Bulan</label>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                      <span style={{ fontSize: "0.88rem", fontWeight: 700 }}>Tanggal</span>
+                      <select
+                        value={dueDateDay}
+                        onChange={(e) => setDueDateDay(e.target.value)}
+                        style={{ padding: "0.65rem 0.85rem", border: "1px solid var(--border-glass)", borderRadius: "6px", backgroundColor: "var(--bg-app)", fontSize: "0.9rem" }}
+                      >
+                        <option value="5">5</option>
+                        <option value="10">10 (Rekomendasi)</option>
+                        <option value="15">15</option>
+                        <option value="20">20</option>
+                        <option value="25">25</option>
+                      </select>
+                      <span style={{ fontSize: "0.88rem", fontWeight: 700 }}>setiap bulannya</span>
+                    </div>
+                  </div>
+
+                  <div style={{ backgroundColor: "var(--bg-surface-low)", border: "1px solid var(--border-glass)", borderRadius: "6px", padding: "0.85rem", fontSize: "0.8rem", color: "var(--text-muted)" }}>
+                    <strong>Sistem Potongan Beasiswa:</strong> Santri yang memiliki potongan beasiswa tetap akan otomatis dikurangi dari nominal acuan Rp {Number(nominalSPP).toLocaleString("id-ID")}.
+                  </div>
+
+                  <button type="submit" style={{ padding: "0.75rem", backgroundColor: "var(--primary)", color: "#fff", border: "none", borderRadius: "6px", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem" }}>
+                    <Save size={18} /> Simpan Parameter SPP
+                  </button>
+                </form>
+              </GlassCard>
+            </div>
+          )}
+
+          {/* TAB 2: TAHUN AJARAN */}
           {activeTab === "Tahun Ajaran" && (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(400px, 1fr))", gap: "1.5rem" }}>
               <GlassCard style={{ display: "flex", flexDirection: "column", gap: "1rem", padding: "1.5rem" }}>
@@ -136,8 +232,8 @@ export default function AdminPengaturanPage() {
             </div>
           )}
 
-          {/* TAB 2: JENIS TAGIHAN */}
-          {activeTab === "Jenis Tagihan" && (
+          {/* TAB 3: MASTER TAGIHAN */}
+          {activeTab === "Master Tagihan" && (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(400px, 1fr))", gap: "1.5rem" }}>
               <GlassCard style={{ display: "flex", flexDirection: "column", gap: "1rem", padding: "1.5rem" }}>
                 <h3 style={{ fontSize: "1.1rem", fontWeight: 800, color: "var(--text-main)", borderBottom: "1px solid var(--border-glass)", paddingBottom: "0.5rem" }}>
@@ -149,7 +245,7 @@ export default function AdminPengaturanPage() {
                     <input
                       type="text"
                       required
-                      placeholder="Contoh: SPP Bulanan / Seragam"
+                      placeholder="Contoh: Uang Gedung / Buku Modul"
                       value={jenisNama}
                       onChange={(e) => setJenisNama(e.target.value)}
                       style={{ width: "100%", padding: "0.6rem", border: "1px solid var(--border-glass)", borderRadius: "4px", marginTop: "0.2rem" }}
@@ -209,10 +305,81 @@ export default function AdminPengaturanPage() {
               </GlassCard>
             </div>
           )}
+
+          {/* TAB 4: REKENING BANK */}
+          {activeTab === "Rekening Bank" && (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(420px, 1fr))", gap: "1.5rem" }}>
+              <GlassCard style={{ display: "flex", flexDirection: "column", gap: "1.25rem", padding: "1.5rem" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", borderBottom: "1px solid var(--border-glass)", paddingBottom: "0.75rem" }}>
+                  <div style={{ padding: "0.5rem", borderRadius: "8px", backgroundColor: "var(--primary-light)", color: "var(--primary)" }}>
+                    <CreditCard size={22} />
+                  </div>
+                  <div>
+                    <h3 style={{ fontSize: "1.1rem", fontWeight: 800, color: "var(--text-main)" }}>
+                      Rekening Bank Pembayaran Pesantren
+                    </h3>
+                    <p style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>
+                      Nomor rekening ini ditampilkan ke Wali Murid saat melakukan transfer setoran.
+                    </p>
+                  </div>
+                </div>
+
+                {bankSavedAlert && (
+                  <div style={{ backgroundColor: "var(--status-lunas-bg)", border: "1px solid var(--status-lunas)", borderRadius: "6px", padding: "0.75rem 1rem", color: "var(--status-lunas)", fontSize: "0.85rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                    <CheckCircle2 size={18} />
+                    <span>Rekening Bank Pesantren berhasil diperbarui!</span>
+                  </div>
+                )}
+
+                <form onSubmit={handleSaveBank} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                  <div>
+                    <label style={{ fontSize: "0.75rem", fontWeight: 800, textTransform: "uppercase", color: "var(--text-muted)" }}>Atas Nama Rekening (Pemilik)</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Yayasan Pondok Pesantren..."
+                      value={atasNama}
+                      onChange={(e) => setAtasNama(e.target.value)}
+                      style={{ width: "100%", padding: "0.65rem 0.85rem", border: "1px solid var(--border-glass)", borderRadius: "6px", backgroundColor: "var(--bg-app)", fontSize: "0.9rem", marginTop: "0.2rem" }}
+                    />
+                  </div>
+
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+                    <div>
+                      <label style={{ fontSize: "0.75rem", fontWeight: 800, textTransform: "uppercase", color: "var(--text-muted)" }}>No. Rekening BCA</label>
+                      <input
+                        type="text"
+                        placeholder="1234567890"
+                        value={bankBca}
+                        onChange={(e) => setBankBca(e.target.value)}
+                        style={{ width: "100%", padding: "0.65rem 0.85rem", border: "1px solid var(--border-glass)", borderRadius: "6px", backgroundColor: "var(--bg-app)", fontSize: "0.9rem", marginTop: "0.2rem" }}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ fontSize: "0.75rem", fontWeight: 800, textTransform: "uppercase", color: "var(--text-muted)" }}>No. Rekening BSI</label>
+                      <input
+                        type="text"
+                        placeholder="7700123456"
+                        value={bankBsi}
+                        onChange={(e) => setBankBsi(e.target.value)}
+                        style={{ width: "100%", padding: "0.65rem 0.85rem", border: "1px solid var(--border-glass)", borderRadius: "6px", backgroundColor: "var(--bg-app)", fontSize: "0.9rem", marginTop: "0.2rem" }}
+                      />
+                    </div>
+                  </div>
+
+                  <button type="submit" style={{ padding: "0.75rem", backgroundColor: "var(--primary)", color: "#fff", border: "none", borderRadius: "6px", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem" }}>
+                    <Save size={18} /> Simpan Data Rekening
+                  </button>
+                </form>
+              </GlassCard>
+            </div>
+          )}
         </div>
       </main>
     </div>
   );
 }
+
 
 
