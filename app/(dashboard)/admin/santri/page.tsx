@@ -236,18 +236,21 @@ export default function AdminSantriPage() {
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
                 <div>
-                  <label style={{ fontSize: "0.75rem", fontWeight: 800, textTransform: "uppercase", color: "var(--text-muted)" }}>Kelas</label>
-                  <select
+                  <label style={{ fontSize: "0.75rem", fontWeight: 800, textTransform: "uppercase", color: "var(--text-muted)" }}>Kelas (Ketik / Pilih Suggestion)</label>
+                  <input
+                    type="text"
+                    required
+                    list="kelas-suggestions"
+                    placeholder="Contoh: 7A, 8B, 10 IPA..."
                     value={kelas}
                     onChange={(e) => setKelas(e.target.value)}
                     style={{ width: "100%", padding: "0.6rem", border: "1px solid var(--border-glass)", borderRadius: "4px", marginTop: "0.2rem" }}
-                  >
-                    <option value="7A">Kelas 7A</option>
-                    <option value="7B">Kelas 7B</option>
-                    <option value="8A">Kelas 8A</option>
-                    <option value="8B">Kelas 8B</option>
-                    <option value="9A">Kelas 9A</option>
-                  </select>
+                  />
+                  <datalist id="kelas-suggestions">
+                    {Array.from(new Set(["7A", "7B", "8A", "8B", "9A", "10 IPA", "11 IPS", ...santriList.map((s) => s.kelas?.name).filter(Boolean)])).map((k) => (
+                      <option key={k} value={k} />
+                    ))}
+                  </datalist>
                 </div>
 
                 <div>
