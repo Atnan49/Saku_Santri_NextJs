@@ -36,59 +36,7 @@ interface VerificationItem {
 }
 
 export default function AdminVerifikasiPage() {
-  const [queueList, setQueueList] = useState<Array<VerificationItem>>([
-    {
-      id: "VER-001",
-      refNo: "REF-2311-001",
-      reportDate: "12 NOV 2023",
-      studentName: "Budi Santoso",
-      studentClass: "XII IPA 1",
-      parentName: "Wali Budi Santoso",
-      category: "SPP Semester Ganjil",
-      dateTimeStr: "12 Nov 2023, 14:30",
-      originalAmount: 3000000,
-      expectedAmount: 2500000,
-      reportedAmount: 2500000,
-      hasScholarship: true,
-      paymentMethod: "Bank BCA - Transfer ATM",
-      proofImageUrl: "/sample_receipt.png",
-      status: "PENDING",
-    },
-    {
-      id: "VER-002",
-      refNo: "REF-2311-002",
-      reportDate: "12 NOV 2023",
-      studentName: "Siti Aminah",
-      studentClass: "Kelas X IPS 2",
-      parentName: "Wali Siti Aminah",
-      category: "Uang Gedung Cicilan 1",
-      dateTimeStr: "12 Nov 2023, 10:15",
-      originalAmount: 5000000,
-      expectedAmount: 5000000,
-      reportedAmount: 5000000,
-      hasScholarship: false,
-      paymentMethod: "Bank BSI - Mobile Banking",
-      proofImageUrl: "/sample_receipt.png",
-      status: "PENDING",
-    },
-    {
-      id: "VER-003",
-      refNo: "REF-2311-003",
-      reportDate: "11 NOV 2023",
-      studentName: "Andi Wijaya Kusuma",
-      studentClass: "Kelas XI Bahasa",
-      parentName: "Wali Andi Wijaya",
-      category: "Seragam & Buku",
-      dateTimeStr: "11 Nov 2023, 16:45",
-      originalAmount: 1250000,
-      expectedAmount: 1250000,
-      reportedAmount: 1250000,
-      hasScholarship: false,
-      paymentMethod: "Bank Mandiri - Transfer Teller",
-      proofImageUrl: "/sample_receipt.png",
-      status: "PENDING",
-    },
-  ]);
+  const [queueList, setQueueList] = useState<Array<VerificationItem>>([]);
 
   const [selectedId, setSelectedId] = useState<string>("VER-001");
   const [searchQuery, setSearchQuery] = useState("");
@@ -214,67 +162,73 @@ export default function AdminVerifikasiPage() {
               </div>
 
               <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-                {filteredQueue.map((item) => {
-                  const isSelected = item.id === selectedItem?.id;
-                  return (
-                    <div
-                      key={item.id}
-                      onClick={() => setSelectedId(item.id)}
-                      style={{
-                        padding: "1rem",
-                        borderRadius: "8px",
-                        border: isSelected ? "2px solid var(--primary)" : "1px solid var(--border-glass)",
-                        backgroundColor: isSelected ? "var(--bg-surface-hover)" : "var(--bg-surface)",
-                        cursor: "pointer",
-                        transition: "all 0.2s ease",
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: "0.4rem",
-                      }}
-                    >
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                        <span style={{ fontSize: "0.75rem", fontWeight: 800, color: "var(--text-muted)" }}>
-                          {item.refNo}
-                        </span>
-                        {item.status === "PENDING" && (
-                          <span style={{ fontSize: "0.7rem", fontWeight: 800, padding: "0.2rem 0.5rem", borderRadius: "999px", backgroundColor: "var(--status-menunggu-bg)", color: "var(--status-menunggu)" }}>
-                            PENDING
+                {filteredQueue.length > 0 ? (
+                  filteredQueue.map((item) => {
+                    const isSelected = item.id === selectedItem?.id;
+                    return (
+                      <div
+                        key={item.id}
+                        onClick={() => setSelectedId(item.id)}
+                        style={{
+                          padding: "1rem",
+                          borderRadius: "8px",
+                          border: isSelected ? "2px solid var(--primary)" : "1px solid var(--border-glass)",
+                          backgroundColor: isSelected ? "var(--bg-surface-hover)" : "var(--bg-surface)",
+                          cursor: "pointer",
+                          transition: "all 0.2s ease",
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "0.4rem",
+                        }}
+                      >
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <span style={{ fontSize: "0.75rem", fontWeight: 800, color: "var(--text-muted)" }}>
+                            {item.refNo}
                           </span>
-                        )}
-                        {item.status === "LUNAS" && (
-                          <span style={{ fontSize: "0.7rem", fontWeight: 800, padding: "0.2rem 0.5rem", borderRadius: "999px", backgroundColor: "var(--status-lunas-bg)", color: "var(--status-lunas)" }}>
-                            LUNAS
+                          {item.status === "PENDING" && (
+                            <span style={{ fontSize: "0.7rem", fontWeight: 800, padding: "0.2rem 0.5rem", borderRadius: "999px", backgroundColor: "var(--status-menunggu-bg)", color: "var(--status-menunggu)" }}>
+                              PENDING
+                            </span>
+                          )}
+                          {item.status === "LUNAS" && (
+                            <span style={{ fontSize: "0.7rem", fontWeight: 800, padding: "0.2rem 0.5rem", borderRadius: "999px", backgroundColor: "var(--status-lunas-bg)", color: "var(--status-lunas)" }}>
+                              LUNAS
+                            </span>
+                          )}
+                          {item.status === "DITOLAK" && (
+                            <span style={{ fontSize: "0.7rem", fontWeight: 800, padding: "0.2rem 0.5rem", borderRadius: "999px", backgroundColor: "var(--status-ditolak-bg)", color: "var(--status-ditolak)" }}>
+                              DITOLAK
+                            </span>
+                          )}
+                        </div>
+
+                        <div style={{ fontSize: "0.95rem", fontWeight: 800, color: "var(--text-main)" }}>
+                          {item.studentName}
+                        </div>
+
+                        <div style={{ fontSize: "0.76rem", color: "var(--text-muted)" }}>
+                          {item.studentClass} • {item.category}
+                        </div>
+
+                        <div style={{ borderTop: "1px dashed var(--border-glass)", paddingTop: "0.4rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <span style={{ fontSize: "0.72rem", color: "var(--text-dim)" }}>{item.dateTimeStr}</span>
+                          <span style={{ fontSize: "0.95rem", fontWeight: 800, color: "var(--text-main)" }}>
+                            Rp {item.reportedAmount.toLocaleString("id-ID")}
                           </span>
-                        )}
-                        {item.status === "DITOLAK" && (
-                          <span style={{ fontSize: "0.7rem", fontWeight: 800, padding: "0.2rem 0.5rem", borderRadius: "999px", backgroundColor: "var(--status-ditolak-bg)", color: "var(--status-ditolak)" }}>
-                            DITOLAK
-                          </span>
-                        )}
+                        </div>
                       </div>
-
-                      <div style={{ fontSize: "0.95rem", fontWeight: 800, color: "var(--text-main)" }}>
-                        {item.studentName}
-                      </div>
-
-                      <div style={{ fontSize: "0.76rem", color: "var(--text-muted)" }}>
-                        {item.studentClass} • {item.category}
-                      </div>
-
-                      <div style={{ borderTop: "1px dashed var(--border-glass)", paddingTop: "0.4rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                        <span style={{ fontSize: "0.72rem", color: "var(--text-dim)" }}>{item.dateTimeStr}</span>
-                        <span style={{ fontSize: "0.95rem", fontWeight: 800, color: "var(--text-main)" }}>
-                          Rp {item.reportedAmount.toLocaleString("id-ID")}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })
+                ) : (
+                  <div style={{ padding: "2rem 1rem", textAlign: "center", color: "var(--text-muted)", fontSize: "0.85rem" }}>
+                    Tidak ada dokumen setoran dalam antrean.
+                  </div>
+                )}
               </div>
             </div>
 
             {/* RIGHT COLUMN: Detail Review Panel */}
-            {selectedItem && (
+            {selectedItem ? (
               <div className="glass-card" style={{ padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1.5rem" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                   <div>
@@ -515,6 +469,10 @@ export default function AdminVerifikasiPage() {
                     TOLAK VERIFIKASI
                   </button>
                 </div>
+              </div>
+            ) : (
+              <div className="glass-card" style={{ padding: "3rem", textAlign: "center", color: "var(--text-muted)", fontSize: "0.9rem" }}>
+                Tidak ada dokumen setoran yang dipilih atau membutuhkan tindakan verifikasi saat ini.
               </div>
             )}
           </div>

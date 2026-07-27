@@ -65,35 +65,7 @@ export default function AdminDashboardPage() {
     fetchStats();
   }, []);
 
-  const pendingVerificationList = [
-    {
-      id: "BYR-0982",
-      santri: "M. Farhan Syahputra",
-      kelas: "Kelas 5B",
-      nominal: 450000,
-      jenis: "SPP Bulanan",
-      waktu: "10 menit lalu",
-      status: "MENUNGGU_VERIFIKASI_ADMIN",
-    },
-    {
-      id: "BYR-0981",
-      santri: "Ahmad Santri",
-      kelas: "Kelas 7A",
-      nominal: 250000,
-      jenis: "SPP Bulanan",
-      waktu: "42 menit lalu",
-      status: "MENUNGGU_VERIFIKASI_ADMIN",
-    },
-    {
-      id: "BYR-0980",
-      santri: "Siti Aminah Zahra",
-      kelas: "Kelas 3A",
-      nominal: 350000,
-      jenis: "Buku Modul",
-      waktu: "2 jam lalu",
-      status: "MENUNGGU_VERIFIKASI_ADMIN",
-    },
-  ];
+  const pendingVerificationList: any[] = [];
 
   return (
     <div className="app-container" style={{ display: "flex", minHeight: "100vh" }}>
@@ -252,41 +224,49 @@ export default function AdminDashboardPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {pendingVerificationList.map((item) => (
-                        <tr key={item.id} style={{ borderBottom: "1px solid var(--border-glass)" }}>
-                          <td style={{ padding: "0.9rem 1rem", fontWeight: 700, color: "var(--primary)" }}>{item.id}</td>
-                          <td style={{ padding: "0.9rem 1rem", color: "var(--text-main)" }}>
-                            <div style={{ fontWeight: 700 }}>{item.santri}</div>
-                            <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>{item.kelas}</div>
-                          </td>
-                          <td style={{ padding: "0.9rem 1rem", color: "var(--text-main)" }}>{item.jenis}</td>
-                          <td style={{ padding: "0.9rem 1rem", fontWeight: 800, color: "var(--text-main)" }}>{formatIDR(item.nominal)}</td>
-                          <td style={{ padding: "0.9rem 1rem" }}>
-                            <StatusBadge status={item.status} />
-                          </td>
-                          <td style={{ padding: "0.9rem 1rem", textAlign: "center" }}>
-                            <div style={{ display: "flex", justifyContent: "center", gap: "0.5rem" }}>
-                              <button
-                                style={{
-                                  padding: "0.4rem 0.75rem",
-                                  fontSize: "0.78rem",
-                                  fontWeight: 700,
-                                  backgroundColor: "var(--primary-light)",
-                                  color: "var(--primary)",
-                                  border: "1px solid var(--primary)",
-                                  borderRadius: "6px",
-                                  cursor: "pointer",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: "0.3rem",
-                                }}
-                              >
-                                <CheckCircle2 size={14} /> Verifikasi
-                              </button>
-                            </div>
+                      {pendingVerificationList.length > 0 ? (
+                        pendingVerificationList.map((item) => (
+                          <tr key={item.id} style={{ borderBottom: "1px solid var(--border-glass)" }}>
+                            <td style={{ padding: "0.9rem 1rem", fontWeight: 700, color: "var(--primary)" }}>{item.id}</td>
+                            <td style={{ padding: "0.9rem 1rem", color: "var(--text-main)" }}>
+                              <div style={{ fontWeight: 700 }}>{item.santri}</div>
+                              <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>{item.kelas}</div>
+                            </td>
+                            <td style={{ padding: "0.9rem 1rem", color: "var(--text-main)" }}>{item.jenis}</td>
+                            <td style={{ padding: "0.9rem 1rem", fontWeight: 800, color: "var(--text-main)" }}>{formatIDR(item.nominal)}</td>
+                            <td style={{ padding: "0.9rem 1rem" }}>
+                              <StatusBadge status={item.status} />
+                            </td>
+                            <td style={{ padding: "0.9rem 1rem", textAlign: "center" }}>
+                              <div style={{ display: "flex", justifyContent: "center", gap: "0.5rem" }}>
+                                <button
+                                  style={{
+                                    padding: "0.4rem 0.75rem",
+                                    fontSize: "0.78rem",
+                                    fontWeight: 700,
+                                    backgroundColor: "var(--primary-light)",
+                                    color: "var(--primary)",
+                                    border: "1px solid var(--primary)",
+                                    borderRadius: "6px",
+                                    cursor: "pointer",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "0.3rem",
+                                  }}
+                                >
+                                  <CheckCircle2 size={14} /> Verifikasi
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={6} style={{ padding: "2.5rem", textAlign: "center", color: "var(--text-muted)", fontSize: "0.88rem" }}>
+                            Belum ada dokumen setoran yang membutuhkan verifikasi saat ini.
                           </td>
                         </tr>
-                      ))}
+                      )}
                     </tbody>
                   </table>
                 </div>

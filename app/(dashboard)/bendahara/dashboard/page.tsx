@@ -63,15 +63,7 @@ export default function BendaharaDashboardPage() {
     nominal: Number(nominal),
   }));
 
-  if (tunggakanData.length === 0) {
-    tunggakanData.push(
-      { name: "Kelas 7A", nominal: 1850000 },
-      { name: "Kelas 7B", nominal: 2400000 },
-      { name: "Kelas 8A", nominal: 1200000 },
-      { name: "Kelas 8B", nominal: 3100000 },
-      { name: "Kelas 9A", nominal: 950000 }
-    );
-  }
+// No dummy push when database is empty
 
   return (
     <div className="app-container" style={{ display: "flex", minHeight: "100vh" }}>
