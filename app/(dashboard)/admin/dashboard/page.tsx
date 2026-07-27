@@ -1,301 +1,301 @@
-"use client";
-
-// =========================================================================
-// TANGGUNG JAWAB: Usva (Frontend) & Atnan (Backend/Logic)
-// Deskripsi: Dashboard utama Admin Tata Usaha dengan layout macOS/iOS Ledger,
-//            tata letak grid interaktif, statistik real-time, dan grafik Recharts.
-// =========================================================================
-
-import React, { useState, useEffect } from "react";
-import SidebarNav from "@/components/ui/SidebarNav";
-import TopHeader from "@/components/ui/TopHeader";
-import GlassCard from "@/components/ui/GlassCard";
-import StatusBadge from "@/components/ui/StatusBadge";
-import { getAdminDashboardStats } from "@/lib/actions/laporan";
-import { formatIDR } from "@/lib/utils";
-import {
-  Users,
-  Clock,
+// app/(dashboard)/admin/dashboard/page.tsx
+import { prisma } from "@/lib/prisma";
+import { 
+  Bell, 
+  Search, 
+  Plus, 
+  AlertTriangle, 
+  Filter, 
+  Download, 
+  FileText,
   CreditCard,
-  TrendingUp,
-  ArrowUpRight,
-  FileCheck,
-  CheckCircle2,
-  XCircle,
-  Loader2,
+  CheckSquare,
+  Settings,
+  LayoutDashboard
 } from "lucide-react";
-import {
-  ResponsiveContainer,
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  Tooltip,
-  CartesianGrid,
-} from "recharts";
 
-const chartData = [
-  { bulan: "Jul", penerimaan: 12500000, tunggakan: 3200000 },
-  { bulan: "Agu", penerimaan: 15800000, tunggakan: 2800000 },
-  { bulan: "Sep", penerimaan: 14200000, tunggakan: 4100000 },
-  { bulan: "Okt", penerimaan: 18900000, tunggakan: 2100000 },
-  { bulan: "Nov", penerimaan: 16500000, tunggakan: 3500000 },
-  { bulan: "Des", penerimaan: 21000000, tunggakan: 1800000 },
-];
+export default async function AdminDashboardPage() {
+  let totalTagihanAktif = { _sum: { nominalAkhir: null as any } };
+  let berkasMenunggu = 0;
+  let totalTunggakan = { _sum: { nominalAkhir: null as any } };
+  let jumlahSiswaTunggakan = 0;
+  let riwayatTransaksi: any[] = [];
 
-export default function AdminDashboardPage() {
-  const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({
-    totalSiswa: 0,
-    pendingVerification: 0,
-    totalTagihanBulanIni: 0,
-  });
+  try {
+    totalTagihanAktif = await prisma.tagihan.aggregate({
+      _sum: { nominalAkhir: true },
+      where: { status: "BELUM_BAYAR" }
+    });
 
-  useEffect(() => {
-    async function fetchStats() {
-      try {
-        const data = await getAdminDashboardStats();
-        setStats(data);
-      } catch (err) {
-        console.error("Gagal memuat statistik admin:", err);
-      } finally {
-        setLoading(false);
+    berkasMenunggu = await prisma.pembayaran.count({
+      where: { verifiedAt: null }
+    });
+
+    totalTunggakan = await prisma.tagihan.aggregate({
+      _sum: { nominalAkhir: true },
+      where: { status: "MENUNGGU_VERIFIKASI_ADMIN" }
+    });
+
+    jumlahSiswaTunggakan = await prisma.siswa.count({
+      where: {
+        tagihan: {
+          some: { status: "MENUNGGU_VERIFIKASI_ADMIN" }
+        }
       }
-    }
-    fetchStats();
-  }, []);
+    });
 
-  const pendingVerificationList = [
-    {
-      id: "BYR-0982",
-      santri: "M. Farhan Syahputra",
-      kelas: "Kelas 5B",
-      nominal: 450000,
-      jenis: "SPP Bulanan",
-      waktu: "10 menit lalu",
-      status: "MENUNGGU_VERIFIKASI_ADMIN",
-    },
-    {
-      id: "BYR-0981",
-      santri: "Ahmad Santri",
-      kelas: "Kelas 7A",
-      nominal: 250000,
-      jenis: "SPP Bulanan",
-      waktu: "42 menit lalu",
-      status: "MENUNGGU_VERIFIKASI_ADMIN",
-    },
-    {
-      id: "BYR-0980",
-      santri: "Siti Aminah Zahra",
-      kelas: "Kelas 3A",
-      nominal: 350000,
-      jenis: "Buku Modul",
-      waktu: "2 jam lalu",
-      status: "MENUNGGU_VERIFIKASI_ADMIN",
-    },
-  ];
+    riwayatTransaksi = await prisma.pembayaran.findMany({
+      take: 5,
+      orderBy: { createdAt: "desc" },
+      include: {
+        tagihan: {
+          include: {
+            siswa: {
+              include: { kelas: true }
+            },
+            jenisTagihan: true
+          }
+        }
+      }
+    });
+  } catch (error) {
+    console.error("Gagal mengambil data dashboard Prisma:", error);
+  }
+
+  const kuitansiTerakhir = riwayatTransaksi && riwayatTransaksi.length > 0 ? riwayatTransaksi[0] : null;
+
+  const formatRupiah = (val: any) => {
+    if (!val) return "0";
+    const num = typeof val === "number" ? val : Number(val);
+    return isNaN(num) ? "0" : new Intl.NumberFormat("id-ID").format(num);
+  };
 
   return (
-    <div className="app-container" style={{ display: "flex", minHeight: "100vh" }}>
-      <SidebarNav activeItem="DASHBOARD" userRole="ADMINISTRATOR" userName="Admin Tata Usaha" />
-
-      <main className="main-content" style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
-        <TopHeader title="SISTEM KEUANGAN INSTITUSI - PORTAL ADMINISTRATOR TU" />
-
-        <div className="page-body" style={{ padding: "1.75rem 2rem", maxWidth: "1400px", margin: "0 auto", width: "100%", display: "flex", flexDirection: "column", gap: "2rem" }}>
-          
-          {loading ? (
-            <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "300px" }}>
-              <Loader2 className="animate-spin" size={36} style={{ color: "var(--primary)" }} />
+    <div style={{ display: "flex", minHeight: "100vh", backgroundColor: "#FDFBF7", color: "#2D3748", fontFamily: 'Georgia, Cambria, "Times New Roman", Times, serif' }}>
+      
+      {/* SIDEBAR NAVIGATION */}
+      <aside style={{ width: "256px", borderRight: "1px solid #E2E8F0", padding: "24px", display: "flex", flexDirection: "column", justifyContent: "space-between", backgroundColor: "#FDFBF7", flexShrink: 0 }}>
+        <div>
+          {/* Logo */}
+          <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "32px" }}>
+            <div style={{ width: "32px", height: "32px", borderRadius: "50%", backgroundColor: "#1B4332", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontWeight: "bold", fontSize: "14px", fontFamily: "sans-serif" }}>
+              SS
             </div>
-          ) : (
-            <>
-              {/* SECTION 1: Summary Cards Grid */}
-              <section>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "1.25rem" }}>
-                  {/* Card 1: Total Siswa */}
-                  <GlassCard className="interactive" style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <span style={{ fontSize: "0.78rem", fontWeight: 800, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                        Total Siswa Aktif
-                      </span>
-                      <div style={{ padding: "0.5rem", borderRadius: "10px", backgroundColor: "var(--primary-light)", color: "var(--primary)" }}>
-                        <Users size={20} />
-                      </div>
-                    </div>
-                    <div style={{ fontSize: "1.8rem", fontWeight: 800, color: "var(--text-main)" }}>
-                      {stats.totalSiswa} <span style={{ fontSize: "0.9rem", fontWeight: 600, color: "var(--text-muted)" }}>Santri</span>
-                    </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.3rem", fontSize: "0.75rem", color: "var(--status-lunas)" }}>
-                      <ArrowUpRight size={14} /> Terdaftar di Sistem Buku Besar
-                    </div>
-                  </GlassCard>
+            <h1 style={{ fontWeight: "bold", fontSize: "20px", color: "#1B4332", fontFamily: "sans-serif", margin: 0 }}>
+              Saku Santri
+            </h1>
+          </div>
 
-                  {/* Card 2: Menunggu Verifikasi */}
-                  <GlassCard className="interactive" style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <span style={{ fontSize: "0.78rem", fontWeight: 800, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                        Menunggu Verifikasi Admin
-                      </span>
-                      <div style={{ padding: "0.5rem", borderRadius: "10px", backgroundColor: "var(--status-menunggu-bg)", color: "var(--status-menunggu)" }}>
-                        <Clock size={20} />
-                      </div>
-                    </div>
-                    <div style={{ fontSize: "1.8rem", fontWeight: 800, color: "var(--text-main)" }}>
-                      {stats.pendingVerification} <span style={{ fontSize: "0.9rem", fontWeight: 600, color: "var(--text-muted)" }}>Berkas</span>
-                    </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.3rem", fontSize: "0.75rem", color: "var(--status-menunggu)" }}>
-                      Perlu Tindakan Admin TU
-                    </div>
-                  </GlassCard>
+          {/* Navigation Links */}
+          <nav style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+            <a href="#" style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px 16px", textDecoration: "none", backgroundColor: "#1B4332", color: "white", borderRadius: "2px", fontFamily: "sans-serif", fontSize: "12px", fontWeight: "bold", letterSpacing: "0.05em" }}>
+              <LayoutDashboard style={{ width: "16px", height: "16px" }} />
+              DASHBOARD
+            </a>
+            <a href="#" style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px 16px", textDecoration: "none", color: "#4A5568", borderRadius: "2px", fontFamily: "sans-serif", fontSize: "12px", fontWeight: "600", letterSpacing: "0.05em" }}>
+              <CreditCard style={{ width: "16px", height: "16px" }} />
+              TAGIHAN
+            </a>
+            <a href="#" style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px 16px", textDecoration: "none", color: "#4A5568", borderRadius: "2px", fontFamily: "sans-serif", fontSize: "12px", fontWeight: "600", letterSpacing: "0.05em" }}>
+              <CheckSquare style={{ width: "16px", height: "16px" }} />
+              VERIFIKASI
+            </a>
+            <a href="#" style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px 16px", textDecoration: "none", color: "#4A5568", borderRadius: "2px", fontFamily: "sans-serif", fontSize: "12px", fontWeight: "600", letterSpacing: "0.05em" }}>
+              <FileText style={{ width: "16px", height: "16px" }} />
+              LAPORAN
+            </a>
+            <a href="#" style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px 16px", textDecoration: "none", color: "#4A5568", borderRadius: "2px", fontFamily: "sans-serif", fontSize: "12px", fontWeight: "600", letterSpacing: "0.05em" }}>
+              <Settings style={{ width: "16px", height: "16px" }} />
+              PENGATURAN
+            </a>
+          </nav>
+        </div>
 
-                  {/* Card 3: Total Tagihan Bulan Ini */}
-                  <GlassCard className="interactive" style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <span style={{ fontSize: "0.78rem", fontWeight: 800, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                        Tagihan Terbit Bulan Ini
-                      </span>
-                      <div style={{ padding: "0.5rem", borderRadius: "10px", backgroundColor: "var(--primary-light)", color: "var(--primary)" }}>
-                        <CreditCard size={20} />
-                      </div>
-                    </div>
-                    <div style={{ fontSize: "1.6rem", fontWeight: 800, color: "var(--text-main)" }}>
-                      {formatIDR(stats.totalTagihanBulanIni)}
-                    </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.3rem", fontSize: "0.75rem", color: "var(--text-muted)" }}>
-                      Bulan Berjalan 2026
-                    </div>
-                  </GlassCard>
+        {/* User Footer Profile */}
+        <div style={{ paddingTop: "16px", borderTop: "1px solid #E2E8F0", display: "flex", alignItems: "center", gap: "12px", fontFamily: "sans-serif" }}>
+          <div style={{ width: "32px", height: "32px", borderRadius: "50%", backgroundColor: "#1B4332", color: "white", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold", fontSize: "12px" }}>
+            A
+          </div>
+          <div>
+            <p style={{ fontSize: "10px", fontWeight: "bold", color: "#A0AEC0", margin: 0, textTransform: "uppercase" }}>ADMINISTRATOR</p>
+            <p style={{ fontSize: "12px", fontWeight: "bold", color: "#2D3748", margin: 0 }}>Admin Utama</p>
+          </div>
+        </div>
+      </aside>
+
+      {/* MAIN CONTENT AREA */}
+      <main style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
+        {/* Header Bar */}
+        <header style={{ height: "64px", borderBottom: "1px solid #E2E8F0", padding: "0 32px", display: "flex", alignItems: "center", justifyContent: "space-between", fontFamily: "sans-serif", flexShrink: 0 }}>
+          <p style={{ fontSize: "12px", fontWeight: "bold", letterSpacing: "0.05em", color: "#A0AEC0", margin: 0 }}>SISTEM KEUANGAN INSTITUSI</p>
+          <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+            <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
+              <Search style={{ width: "16px", height: "16px", color: "#A0AEC0", position: "absolute", left: "12px" }} />
+              <input 
+                type="text" 
+                placeholder="Cari data..." 
+                style={{ paddingLeft: "36px", paddingRight: "16px", paddingTop: "6px", paddingBottom: "6px", fontSize: "12px", border: "1px solid #CBD5E0", borderRadius: "2px", width: "256px", background: "transparent", outline: "none" }}
+              />
+            </div>
+            <button style={{ background: "transparent", border: "none", cursor: "pointer", padding: "8px", color: "#718096" }}>
+              <Bell style={{ width: "16px", height: "16px" }} />
+            </button>
+          </div>
+        </header>
+
+        {/* Dashboard Body */}
+        <div style={{ padding: "32px", display: "flex", flexDirection: "column", gap: "32px", overflowY: "auto" }}>
+          
+          {/* Header Title & Actions */}
+          <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between" }}>
+            <div>
+              <h2 style={{ fontSize: "36px", fontWeight: 800, color: "#1A202C", fontFamily: "sans-serif", margin: 0 }}>
+                Buku Induk Harian
+              </h2>
+              <p style={{ fontSize: "12px", fontFamily: "sans-serif", color: "#718096", marginTop: "4px", marginBottom: 0 }}>
+                Posisi Keuangan per {new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}
+              </p>
+            </div>
+            <div style={{ display: "flex", gap: "12px", fontFamily: "sans-serif", fontSize: "12px", fontWeight: "bold" }}>
+              <button style={{ padding: "10px 16px", border: "1px solid #1A202C", background: "transparent", color: "#1A202C", cursor: "pointer", letterSpacing: "0.05em" }}>
+                VERIFIKASI ({berkasMenunggu})
+              </button>
+              <button style={{ padding: "10px 16px", backgroundColor: "#1B4332", color: "white", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: "8px", letterSpacing: "0.05em" }}>
+                <Plus style={{ width: "16px", height: "16px" }} /> BUAT TAGIHAN
+              </button>
+            </div>
+          </div>
+
+          {/* Metric Cards Grid */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", border: "1px solid #CBD5E0", backgroundColor: "white", fontFamily: "sans-serif" }}>
+            <div style={{ padding: "24px", backgroundColor: "#FAF8F5", borderRight: "1px solid #CBD5E0" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                <span style={{ fontSize: "11px", fontWeight: "bold", letterSpacing: "0.05em", color: "#718096" }}>TOTAL TAGIHAN AKTIF</span>
+                <CreditCard style={{ width: "16px", height: "16px", color: "#A0AEC0" }} />
+              </div>
+              <p style={{ fontSize: "24px", fontWeight: "bold", fontFamily: "monospace", color: "#1A202C", marginTop: "16px", marginBottom: 0 }}>
+                <span style={{ fontSize: "14px", color: "#718096" }}>Rp </span>
+                {formatRupiah(totalTagihanAktif._sum.nominalAkhir)}
+              </p>
+            </div>
+
+            <div style={{ padding: "24px", backgroundColor: "#FAF8F5", borderRight: "1px solid #CBD5E0" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                <span style={{ fontSize: "11px", fontWeight: "bold", letterSpacing: "0.05em", color: "#718096" }}>MENUNGGU VERIFIKASI</span>
+                <FileText style={{ width: "16px", height: "16px", color: "#A0AEC0" }} />
+              </div>
+              <p style={{ fontSize: "24px", fontWeight: "bold", fontFamily: "serif", color: "#1A202C", marginTop: "16px", marginBottom: 0 }}>
+                {berkasMenunggu} <span style={{ fontSize: "18px", fontStyle: "italic", fontWeight: "normal" }}>Berkas</span>
+              </p>
+            </div>
+
+            <div style={{ padding: "24px", backgroundColor: "#FFF8F7" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                <span style={{ fontSize: "11px", fontWeight: "bold", letterSpacing: "0.05em", color: "#C53030" }}>TOTAL TUNGGAKAN</span>
+                <AlertTriangle style={{ width: "16px", height: "16px", color: "#E53E3E" }} />
+              </div>
+              <p style={{ fontSize: "24px", fontWeight: "bold", fontFamily: "monospace", color: "#C53030", marginTop: "16px", marginBottom: 0 }}>
+                <span style={{ fontSize: "14px", opacity: 0.7 }}>Rp </span>
+                {formatRupiah(totalTunggakan._sum.nominalAkhir)}
+              </p>
+            </div>
+          </div>
+
+          {/* 2-Column Section (Table + Right Panel) */}
+          <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "32px" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontFamily: "sans-serif" }}>
+                <h3 style={{ fontSize: "18px", fontWeight: "bold", margin: 0 }}>Riwayat Transaksi</h3>
+                <div style={{ display: "flex", gap: "8px" }}>
+                  <button style={{ padding: "6px", border: "1px solid #CBD5E0", background: "white", cursor: "pointer" }}><Filter style={{ width: "14px", height: "14px" }} /></button>
+                  <button style={{ padding: "6px", border: "1px solid #CBD5E0", background: "white", cursor: "pointer" }}><Download style={{ width: "14px", height: "14px" }} /></button>
                 </div>
-              </section>
+              </div>
 
-              {/* SECTION 2: Analytics Chart Recharts */}
-              <section>
-                <div className="glass-card" style={{ display: "flex", flexDirection: "column", gap: "1.25rem", padding: "1.5rem" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
-                      <TrendingUp size={22} style={{ color: "var(--primary)" }} />
-                      <div>
-                        <h3 style={{ fontSize: "1.1rem", fontWeight: 800, color: "var(--text-main)" }}>
-                          Grafik Performa Penerimaan & Tunggakan Keuangan
-                        </h3>
-                        <p style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>
-                          Tren bulanan pemasukan kas vs total tunggakan santri.
-                        </p>
-                      </div>
-                    </div>
-                    <div style={{ display: "flex", gap: "1rem", fontSize: "0.78rem", fontWeight: 700 }}>
-                      <span style={{ display: "flex", alignItems: "center", gap: "0.3rem", color: "var(--primary)" }}>
-                        ● Penerimaan
-                      </span>
-                      <span style={{ display: "flex", alignItems: "center", gap: "0.3rem", color: "var(--status-ditolak)" }}>
-                        ● Tunggakan
-                      </span>
-                    </div>
-                  </div>
-
-                  <div style={{ width: "100%", height: 280 }}>
-                    <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                        <defs>
-                          <linearGradient id="colorPenerimaan" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.4} />
-                            <stop offset="95%" stopColor="var(--primary)" stopOpacity={0.0} />
-                          </linearGradient>
-                          <linearGradient id="colorTunggakan" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="var(--status-ditolak)" stopOpacity={0.4} />
-                            <stop offset="95%" stopColor="var(--status-ditolak)" stopOpacity={0.0} />
-                          </linearGradient>
-                        </defs>
-                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border-glass)" opacity={0.5} />
-                        <XAxis dataKey="bulan" stroke="var(--text-muted)" fontSize={12} />
-                        <YAxis stroke="var(--text-muted)" fontSize={12} tickFormatter={(v) => `Rp ${(v / 1000000).toFixed(0)}M`} />
-                        <Tooltip
-                          contentStyle={{
-                            backgroundColor: "var(--bg-app)",
-                            borderColor: "var(--border-glass)",
-                            borderRadius: "8px",
-                            color: "var(--text-main)",
-                            fontSize: "0.82rem",
-                          }}
-                          formatter={(val: any) => [formatIDR(Number(val)), ""]}
-                        />
-                        <Area type="monotone" dataKey="penerimaan" stroke="var(--primary)" strokeWidth={2} fillOpacity={1} fill="url(#colorPenerimaan)" name="Penerimaan" />
-                        <Area type="monotone" dataKey="tunggakan" stroke="var(--status-ditolak)" strokeWidth={2} fillOpacity={1} fill="url(#colorTunggakan)" name="Tunggakan" />
-                      </AreaChart>
-                    </ResponsiveContainer>
-                  </div>
-                </div>
-              </section>
-
-              {/* SECTION 3: Antrean Verifikasi Pembayaran */}
-              <section>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                    <FileCheck size={20} style={{ color: "var(--primary)" }} />
-                    <h2 style={{ fontSize: "1.15rem", fontWeight: 800, color: "var(--text-main)" }}>
-                      Antrean Verifikasi Setoran Terbaru
-                    </h2>
-                  </div>
-                </div>
-
-                <div style={{ backgroundColor: "var(--bg-surface)", border: "1px solid var(--border-glass)", borderRadius: "16px", overflow: "hidden" }}>
-                  <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "0.88rem" }}>
-                    <thead>
-                      <tr style={{ backgroundColor: "rgba(255, 255, 255, 0.02)", borderBottom: "1px solid var(--border-glass)" }}>
-                        <th style={{ padding: "0.75rem 1rem", fontSize: "0.75rem", fontWeight: 800, color: "var(--text-muted)", textTransform: "uppercase" }}>ID Transaksi</th>
-                        <th style={{ padding: "0.75rem 1rem", fontSize: "0.75rem", fontWeight: 800, color: "var(--text-muted)", textTransform: "uppercase" }}>Nama Santri</th>
-                        <th style={{ padding: "0.75rem 1rem", fontSize: "0.75rem", fontWeight: 800, color: "var(--text-muted)", textTransform: "uppercase" }}>Jenis Tagihan</th>
-                        <th style={{ padding: "0.75rem 1rem", fontSize: "0.75rem", fontWeight: 800, color: "var(--text-muted)", textTransform: "uppercase" }}>Nominal</th>
-                        <th style={{ padding: "0.75rem 1rem", fontSize: "0.75rem", fontWeight: 800, color: "var(--text-muted)", textTransform: "uppercase" }}>Status</th>
-                        <th style={{ padding: "0.75rem 1rem", fontSize: "0.75rem", fontWeight: 800, color: "var(--text-muted)", textTransform: "uppercase", textAlign: "center" }}>Aksi</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {pendingVerificationList.map((item) => (
-                        <tr key={item.id} style={{ borderBottom: "1px solid var(--border-glass)" }}>
-                          <td style={{ padding: "0.9rem 1rem", fontWeight: 700, color: "var(--primary)" }}>{item.id}</td>
-                          <td style={{ padding: "0.9rem 1rem", color: "var(--text-main)" }}>
-                            <div style={{ fontWeight: 700 }}>{item.santri}</div>
-                            <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>{item.kelas}</div>
-                          </td>
-                          <td style={{ padding: "0.9rem 1rem", color: "var(--text-main)" }}>{item.jenis}</td>
-                          <td style={{ padding: "0.9rem 1rem", fontWeight: 800, color: "var(--text-main)" }}>{formatIDR(item.nominal)}</td>
-                          <td style={{ padding: "0.9rem 1rem" }}>
-                            <StatusBadge status={item.status} />
-                          </td>
-                          <td style={{ padding: "0.9rem 1rem", textAlign: "center" }}>
-                            <div style={{ display: "flex", justifyContent: "center", gap: "0.5rem" }}>
-                              <button
-                                style={{
-                                  padding: "0.4rem 0.75rem",
-                                  fontSize: "0.78rem",
-                                  fontWeight: 700,
-                                  backgroundColor: "var(--primary-light)",
-                                  color: "var(--primary)",
-                                  border: "1px solid var(--primary)",
-                                  borderRadius: "6px",
-                                  cursor: "pointer",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: "0.3rem",
-                                }}
-                              >
-                                <CheckCircle2 size={14} /> Verifikasi
-                              </button>
+              {/* Data Table */}
+              <table style={{ width: "100%", borderCollapse: "collapse", border: "1px solid #CBD5E0", backgroundColor: "white", fontFamily: "sans-serif", fontSize: "12px" }}>
+                <thead>
+                  <tr style={{ backgroundColor: "#F5F2EB", color: "#718096", fontSize: "10px", fontWeight: "bold", textTransform: "uppercase" }}>
+                    <th style={{ padding: "12px", textAlign: "left", borderBottom: "1px solid #CBD5E0", borderRight: "1px solid #CBD5E0" }}>SISWA</th>
+                    <th style={{ padding: "12px", textAlign: "left", borderBottom: "1px solid #CBD5E0", borderRight: "1px solid #CBD5E0" }}>KELAS</th>
+                    <th style={{ padding: "12px", textAlign: "left", borderBottom: "1px solid #CBD5E0", borderRight: "1px solid #CBD5E0" }}>JENIS TAGIHAN</th>
+                    <th style={{ padding: "12px", textAlign: "left", borderBottom: "1px solid #CBD5E0", borderRight: "1px solid #CBD5E0" }}>NOMINAL</th>
+                    <th style={{ padding: "12px", textAlign: "left", borderBottom: "1px solid #CBD5E0" }}>STATUS</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {Array.isArray(riwayatTransaksi) && riwayatTransaksi.length > 0 ? (
+                    riwayatTransaksi.map((item) => {
+                      const isLunas = Boolean(item.approvedAt);
+                      return (
+                        <tr key={item.id}>
+                          <td style={{ padding: "12px", borderBottom: "1px solid #E2E8F0", borderRight: "1px solid #E2E8F0" }}>
+                            <strong>{item.tagihan?.siswa?.name ?? "Tanpa Nama"}</strong>
+                            <div style={{ fontSize: "10px", color: "#A0AEC0", fontFamily: "monospace" }}>
+                              NISN: {item.tagihan?.siswa?.nisn ?? "-"}
                             </div>
                           </td>
+                          <td style={{ padding: "12px", borderBottom: "1px solid #E2E8F0", borderRight: "1px solid #E2E8F0" }}>{item.tagihan?.siswa?.kelas?.name ?? "-"}</td>
+                          <td style={{ padding: "12px", borderBottom: "1px solid #E2E8F0", borderRight: "1px solid #E2E8F0" }}>{item.tagihan?.jenisTagihan?.name ?? "-"}</td>
+                          <td style={{ padding: "12px", borderBottom: "1px solid #E2E8F0", borderRight: "1px solid #E2E8F0", fontFamily: "monospace", fontWeight: "bold" }}>
+                            Rp {formatRupiah(item.tagihan?.nominalAkhir)}
+                          </td>
+                          <td style={{ padding: "12px", borderBottom: "1px solid #E2E8F0" }}>
+                            <span style={{ padding: "2px 8px", fontSize: "9px", fontWeight: 800, letterSpacing: "0.05em", color: "white", textTransform: "uppercase", backgroundColor: isLunas ? "#B58A2A" : "#801212" }}>
+                              {isLunas ? "LUNAS" : "MENUNGGU"}
+                            </span>
+                          </td>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      );
+                    })
+                  ) : (
+                    <tr>
+                      <td colSpan={5} style={{ textAlign: "center", color: "#A0AEC0", padding: "32px", fontStyle: "italic" }}>
+                        Belum ada riwayat transaksi tercatat.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Right Widget Panel */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "24px", fontFamily: "sans-serif" }}>
+              <div style={{ border: "1px solid #CBD5E0", backgroundColor: "white", padding: "24px", textAlign: "center" }}>
+                <div style={{ fontSize: "10px", fontWeight: "bold", color: "#A0AEC0", letterSpacing: "0.05em", marginBottom: "12px" }}>
+                  KOLEKTIBILITAS BULAN INI
                 </div>
-              </section>
-            </>
-          )}
+                <div style={{ width: "128px", height: "128px", borderRadius: "50%", border: "8px solid #EDF2F7", borderTopColor: "#1B4332", borderRightColor: "#1B4332", borderBottomColor: "#1B4332", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", margin: "24px auto" }}>
+                  <span style={{ fontSize: "24px", fontWeight: 900, fontFamily: "monospace" }}>75%</span>
+                  <span style={{ fontSize: "9px", color: "#A0AEC0", fontWeight: "bold" }}>TERCAPAI</span>
+                </div>
+              </div>
+
+              <div style={{ border: "1px solid #CBD5E0", backgroundColor: "#FAF8F5", padding: "24px" }}>
+                <div style={{ fontSize: "10px", fontWeight: "bold", color: "#A0AEC0", letterSpacing: "0.05em", marginBottom: "12px" }}>
+                  PRATINJAU KUITANSI TERAKHIR
+                </div>
+                <div style={{ borderBottom: "1px solid #CBD5E0", paddingBottom: "12px", marginBottom: "12px" }}>
+                  <h5 style={{ margin: 0, fontFamily: "monospace", fontSize: "12px" }}>
+                    {kuitansiTerakhir ? `#KW-${kuitansiTerakhir.id.slice(0, 8)}` : "#KW-EMPTY"}
+                  </h5>
+                </div>
+                <div style={{ fontSize: "12px", display: "flex", flexDirection: "column", gap: "8px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <span style={{ color: "#A0AEC0", fontSize: "10px" }}>DITERIMA DARI</span>
+                    <strong>{kuitansiTerakhir?.tagihan?.siswa?.name ?? "-"}</strong>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <span style={{ color: "#A0AEC0", fontSize: "10px" }}>PEMBAYARAN</span>
+                    <span>{kuitansiTerakhir?.tagihan?.jenisTagihan?.name ?? "-"}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
         </div>
       </main>
     </div>
   );
 }
-
