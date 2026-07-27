@@ -14,6 +14,7 @@ import SegmentedControl from "@/components/ui/SegmentedControl";
 import { formatIDR } from "@/lib/utils";
 import { getTahunAjaranList, createTahunAjaran, setActiveTahunAjaran } from "@/lib/actions/tahun-ajaran";
 import { getJenisTagihanList, createJenisTagihan } from "@/lib/actions/jenis-tagihan";
+import { getWaliMuridList, updateUserPassword } from "@/lib/actions/user";
 import {
   Settings,
   Calendar,
@@ -25,6 +26,8 @@ import {
   Sparkles,
   Layers,
   CalendarDays,
+  Users,
+  KeyRound,
   Loader2,
 } from "lucide-react";
 
@@ -55,12 +58,20 @@ export default function AdminPengaturanPage() {
   const [atasNama, setAtasNama] = useState("Yayasan Pondok Pesantren");
   const [bankSavedAlert, setBankSavedAlert] = useState(false);
 
+  // State Wali Murid
+  const [waliList, setWaliList] = useState<any[]>([]);
+
   const loadData = async () => {
     setLoading(true);
     try {
-      const [tData, jData] = await Promise.all([getTahunAjaranList(), getJenisTagihanList()]);
+      const [tData, jData, wData] = await Promise.all([
+        getTahunAjaranList(),
+        getJenisTagihanList(),
+        getWaliMuridList(),
+      ]);
       setTahunList(tData);
       setJenisList(jData);
+      setWaliList(wData);
 
       // Cari nominal SPP dari master jika ada
       const sppMaster = jData.find((j: any) => j.type === "BULANAN");
@@ -77,6 +88,17 @@ export default function AdminPengaturanPage() {
   useEffect(() => {
     loadData();
   }, []);
+
+  const handleResetPassword = async (userId: string, waliName: string) => {
+    const newPass = prompt(`Masukkan password baru untuk Wali ${waliName} (minimal 6 karakter):`, "wali123");
+    if (!newPass) return;
+    try {
+      await updateUserPassword(userId, newPass);
+      alert(`Password untuk ${waliName} berhasil diubah menjadi: ${newPass}`);
+    } catch (err: any) {
+      alert(err.message || "Gagal mengubah password.");
+    }
+  };
 
   const handleSaveSPP = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -166,9 +188,9 @@ export default function AdminPengaturanPage() {
           </div>
 
           {/* Segmented Control Tabs */}
-          <div style={{ maxWidth: "600px" }}>
+          <div style={{ maxWidth: "750px" }}>
             <SegmentedControl
-              options={["Konfigurasi SPP", "Tahun Ajaran", "Master Tagihan", "Rekening Bank"]}
+              options={["Konfigurasi SPP", "Tahun Ajaran", "Master Tagihan", "Rekening Bank", "Akun Wali"]}
               selectedValue={activeTab}
               onChange={(val) => setActiveTab(val)}
             />
@@ -435,6 +457,79 @@ export default function AdminPengaturanPage() {
                 </form>
               </GlassCard>
             </div>
+          )}
+
+          {/* TAB 5: AKUN WALI MURID */}
+          {activeTab === "Akun Wali" && (
+            <GlassCard style={{ display: "flex", flexDirection: "column", gap: "1.25rem", padding: "1.5rem" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", borderBottom: "1px solid var(--border-glass)", paddingBottom: "0.75rem" }}>
+                <div style={{ padding: "0.5rem", borderRadius: "8px", backgroundColor: "var(--primary-light)", color: "var(--primary)" }}>
+                  <Users size={22} />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: "1.1rem", fontWeight: 800, color: "var(--text-main)" }}>
+                    Manajemen Akun Login Wali Murid
+                  </h3>
+                  <p style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>
+                    Akun ini otomatis dibuat saat menambah santri baru. Gunakan fitur Reset Password jika wali murid lupa kata sandi.
+                  </p>
+                </div>
+              </div>
+
+              <div style={{ backgroundColor: "#ffffff", border: "1px solid var(--border-glass)", borderRadius: "8px", overflow: "hidden" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "0.88rem" }}>
+                  <thead>
+                    <tr style={{ backgroundColor: "#f7f3eb", borderBottom: "1px solid var(--border-glass)" }}>
+                      <th style={{ padding: "0.85rem 1rem", fontSize: "0.75rem", fontWeight: 800, color: "#516071", textTransform: "uppercase" }}>Nama Wali</th>
+                      <th style={{ padding: "0.85rem 1rem", fontSize: "0.75rem", fontWeight: 800, color: "#516071", textTransform: "uppercase" }}>No. HP (Username Login)</th>
+                      <th style={{ padding: "0.85rem 1rem", fontSize: "0.75rem", fontWeight: 800, color: "#516071", textTransform: "uppercase" }}>Jumlah Anak</th>
+                      <th style={{ padding: "0.85rem 1rem", fontSize: "0.75rem", fontWeight: 800, color: "#516071", textTransform: "uppercase", textAlign: "center" }}>Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {waliList.length > 0 ? (
+                      waliList.map((w) => (
+                        <tr key={w.id} style={{ borderBottom: "1px solid var(--border-glass)" }}>
+                          <td style={{ padding: "0.9rem 1rem", fontWeight: 700, color: "var(--text-main)" }}>{w.user?.name || "-"}</td>
+                          <td style={{ padding: "0.9rem 1rem", fontFamily: "'JetBrains Mono', monospace", color: "var(--primary)", fontWeight: 700 }}>
+                            {w.user?.phone || w.user?.username || "-"}
+                          </td>
+                          <td style={{ padding: "0.9rem 1rem", color: "var(--text-muted)", fontWeight: 600 }}>
+                            {w._count?.siswa || 0} Santri
+                          </td>
+                          <td style={{ padding: "0.9rem 1rem", textAlign: "center" }}>
+                            <button
+                              onClick={() => handleResetPassword(w.user.id, w.user.name)}
+                              style={{
+                                padding: "0.4rem 0.75rem",
+                                fontSize: "0.75rem",
+                                fontWeight: 700,
+                                backgroundColor: "var(--status-menunggu-bg)",
+                                color: "var(--status-menunggu)",
+                                border: "1px solid var(--status-menunggu)",
+                                borderRadius: "4px",
+                                cursor: "pointer",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: "0.3rem",
+                              }}
+                            >
+                              <KeyRound size={14} /> Reset Password
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={4} style={{ padding: "3rem", textAlign: "center", color: "var(--text-muted)" }}>
+                          Belum ada akun wali murid yang terdaftar.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </GlassCard>
           )}
         </div>
       </main>
