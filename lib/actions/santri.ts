@@ -112,6 +112,8 @@ export async function updateSantri(
     kelasId?: string;
     waliId?: string;
     potonganTetap?: number;
+    waliName?: string;
+    waliPhone?: string;
   }
 ) {
   await requireAdmin();
@@ -127,7 +129,20 @@ export async function updateSantri(
   const santri = await prisma.siswa.update({
     where: { id },
     data: updateData,
+    include: { wali: { include: { user: true } } },
   });
+
+  if (data.waliName || data.waliPhone) {
+    if (santri.wali?.user?.id) {
+      const userUpdate: any = {};
+      if (data.waliName) userUpdate.name = data.waliName;
+      if (data.waliPhone) userUpdate.phone = data.waliPhone;
+      await prisma.user.update({
+        where: { id: santri.wali.user.id },
+        data: userUpdate,
+      });
+    }
+  }
 
   revalidatePath("/admin/santri");
   return santri;

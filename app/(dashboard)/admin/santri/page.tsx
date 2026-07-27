@@ -10,7 +10,7 @@ import SidebarNav from "@/components/ui/SidebarNav";
 import TopHeader from "@/components/ui/TopHeader";
 import GlassCard from "@/components/ui/GlassCard";
 import { formatIDR } from "@/lib/utils";
-import { getSantriList, createSantri, deleteSantri } from "@/lib/actions/santri";
+import { getSantriList, createSantri, updateSantri, deleteSantri } from "@/lib/actions/santri";
 import { getKelasList, createKelas } from "@/lib/actions/kelas";
 import { createWaliMuridUser } from "@/lib/actions/user";
 import {
@@ -34,6 +34,7 @@ export default function AdminSantriPage() {
   const [kelasList, setKelasList] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [editingSantriId, setEditingSantriId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
 
   // Form State
@@ -67,45 +68,76 @@ export default function AdminSantriPage() {
       s.nisn.includes(searchQuery)
   );
 
-  const handleAddSantri = async (e: React.FormEvent) => {
+  const handleOpenAdd = () => {
+    setEditingSantriId(null);
+    setNisn("");
+    setNama("");
+    setKelas("");
+    setNamaWali("");
+    setNoHpWali("");
+    setPotongan("0");
+    setErrorMessage("");
+    setIsAddModalOpen(true);
+  };
+
+  const handleOpenEdit = (s: any) => {
+    setEditingSantriId(s.id);
+    setNisn(s.nisn);
+    setNama(s.name);
+    setKelas(s.kelas?.name || "");
+    setNamaWali(s.wali?.user?.name || "");
+    setNoHpWali(s.wali?.user?.phone || "");
+    setPotongan(String(s.potonganTetap || 0));
+    setErrorMessage("");
+    setIsAddModalOpen(true);
+  };
+
+  const handleSaveSantri = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!nama) return;
     setSaving(true);
     setErrorMessage("");
 
     try {
-      // 1. Cari atau buat Kelas
-      let selectedKelas = kelasList.find((k) => k.name.toLowerCase() === kelas.trim().toLowerCase());
-      if (!selectedKelas) {
-        selectedKelas = await createKelas(kelas.trim());
+      // 1. Cari atau buat Kelas (jika diisi)
+      let selectedKelasId = "";
+      if (kelas.trim()) {
+        let selectedKelas = kelasList.find((k) => k.name.toLowerCase() === kelas.trim().toLowerCase());
+        if (!selectedKelas) {
+          selectedKelas = await createKelas(kelas.trim());
+        }
+        selectedKelasId = selectedKelas.id;
       }
 
-      // 2. Buat User Wali Murid
-      const phoneClean = noHpWali.trim() || `08${Date.now().toString().slice(-9)}`;
-      const waliRes = await createWaliMuridUser({
-        phone: phoneClean,
-        name: namaWali.trim() || `Wali ${nama.trim()}`,
-        password: "wali123",
-      });
+      if (editingSantriId) {
+        // MODE EDIT
+        await updateSantri(editingSantriId, {
+          name: nama.trim(),
+          kelasId: selectedKelasId || undefined,
+          potonganTetap: Number(potongan) || 0,
+          waliName: namaWali.trim() || undefined,
+          waliPhone: noHpWali.trim() || undefined,
+        });
+      } else {
+        // MODE TAMBAH BARU
+        const phoneClean = noHpWali.trim() || `08${Date.now().toString().slice(-9)}`;
+        const waliRes = await createWaliMuridUser({
+          phone: phoneClean,
+          name: namaWali.trim() || `Wali ${nama.trim()}`,
+          password: "wali123",
+        });
 
-      // 3. Buat Santri dengan Kode Unik Otomatis
-      const autoNisn = `SNT-${new Date().getFullYear()}-${String(santriList.length + 1).padStart(4, "0")}`;
-      await createSantri({
-        nisn: autoNisn,
-        name: nama.trim(),
-        kelasId: selectedKelas.id,
-        waliId: waliRes.waliId!,
-        potonganTetap: Number(potongan) || 0,
-      });
+        const autoNisn = `SNT-${new Date().getFullYear()}-${String(santriList.length + 1).padStart(4, "0")}`;
+        await createSantri({
+          nisn: autoNisn,
+          name: nama.trim(),
+          kelasId: selectedKelasId,
+          waliId: waliRes.waliId!,
+          potonganTetap: Number(potongan) || 0,
+        });
+      }
 
       setIsAddModalOpen(false);
-      // Reset Form
-      setNisn("");
-      setNama("");
-      setNamaWali("");
-      setNoHpWali("");
-      setPotongan("0");
-
       await loadData();
     } catch (err: any) {
       setErrorMessage(err.message || "Gagal menyimpan data santri.");
@@ -145,7 +177,7 @@ export default function AdminSantriPage() {
             </div>
 
             <button
-              onClick={() => setIsAddModalOpen(true)}
+              onClick={handleOpenAdd}
               style={{
                 padding: "0.65rem 1.25rem",
                 fontSize: "0.85rem",
@@ -223,20 +255,40 @@ export default function AdminSantriPage() {
                         {s.potonganTetap > 0 ? formatIDR(s.potonganTetap) : "-"}
                       </td>
                       <td style={{ padding: "0.9rem 1rem", textAlign: "center" }}>
-                        <button
-                          onClick={() => handleDeleteSantri(s.id)}
-                          style={{
-                            padding: "0.35rem 0.6rem",
-                            fontSize: "0.75rem",
-                            backgroundColor: "var(--status-ditolak-bg)",
-                            color: "var(--status-ditolak)",
-                            border: "1px solid var(--status-ditolak)",
-                            borderRadius: "4px",
-                            cursor: "pointer",
-                          }}
-                        >
-                          Hapus
-                        </button>
+                        <div style={{ display: "flex", gap: "0.4rem", justifyContent: "center" }}>
+                          <button
+                            onClick={() => handleOpenEdit(s)}
+                            style={{
+                              padding: "0.35rem 0.65rem",
+                              fontSize: "0.75rem",
+                              fontWeight: 700,
+                              backgroundColor: "var(--primary-light)",
+                              color: "var(--primary)",
+                              border: "1px solid var(--primary)",
+                              borderRadius: "4px",
+                              cursor: "pointer",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "0.25rem",
+                            }}
+                          >
+                            <Edit size={12} /> Edit
+                          </button>
+                          <button
+                            onClick={() => handleDeleteSantri(s.id)}
+                            style={{
+                              padding: "0.35rem 0.6rem",
+                              fontSize: "0.75rem",
+                              backgroundColor: "var(--status-ditolak-bg)",
+                              color: "var(--status-ditolak)",
+                              border: "1px solid var(--status-ditolak)",
+                              borderRadius: "4px",
+                              cursor: "pointer",
+                            }}
+                          >
+                            Hapus
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -253,20 +305,20 @@ export default function AdminSantriPage() {
         </div>
       </main>
 
-      {/* Modal Tambah Santri */}
+      {/* Modal Tambah / Edit Santri */}
       {isAddModalOpen && (
         <div className="modal-overlay" onClick={() => setIsAddModalOpen(false)}>
           <div className="glass-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: "500px", width: "100%", padding: "1.5rem" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.25rem", borderBottom: "1px solid var(--border-glass)", paddingBottom: "0.75rem" }}>
               <h3 style={{ fontSize: "1.1rem", fontWeight: 800, color: "var(--text-main)" }}>
-                Tambah Data Santri Baru
+                {editingSantriId ? "Edit Data Santri" : "Tambah Data Santri Baru"}
               </h3>
               <button onClick={() => setIsAddModalOpen(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-main)" }}>
                 <X size={20} />
               </button>
             </div>
 
-            <form onSubmit={handleAddSantri} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+            <form onSubmit={handleSaveSantri} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
               <div>
                 <label style={{ fontSize: "0.75rem", fontWeight: 800, textTransform: "uppercase", color: "var(--text-muted)" }}>Kode Unik Santri (Otomatis Sistem)</label>
                 <input
@@ -366,7 +418,7 @@ export default function AdminSantriPage() {
                   style={{ padding: "0.6rem 1.25rem", border: "none", borderRadius: "4px", backgroundColor: "var(--primary)", color: "#fff", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: "0.4rem" }}
                 >
                   {saving && <Loader2 className="animate-spin" size={16} />}
-                  {saving ? "Memproses..." : "Simpan Santri"}
+                  {saving ? "Memproses..." : editingSantriId ? "Simpan Perubahan" : "Simpan Santri"}
                 </button>
               </div>
             </form>
