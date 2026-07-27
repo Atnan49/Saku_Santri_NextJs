@@ -1,53 +1,313 @@
+"use client";
+
 // =========================================================================
 // TANGGUNG JAWAB: Usva (Frontend) & Atnan (Backend/Logic)
-// Deskripsi: Halaman pengelolaan data master Santri, Kelas, dan Wali Murid,
-//            serta pengelolaan nominal potongan beasiswa per santri.
-//            - Usva: Membuat UI CRUD dengan tabel data interaktif, form input,
-//                    dan dialog konfirmasi dengan nuansa macOS.
-//            - Atnan: Membuat Server Actions / API Endpoints untuk melakukan
-//                     operasi Create, Read, Update, Delete (CRUD) di DB prisma.
+// Deskripsi: Halaman pengelolaan data master Santri, Kelas, dan Wali Murid.
 // =========================================================================
 
-import React from "react";
-import MacWindowHeader from "@/components/ui/MacWindowHeader";
+import React, { useState, useEffect } from "react";
+import SidebarNav from "@/components/ui/SidebarNav";
+import TopHeader from "@/components/ui/TopHeader";
 import GlassCard from "@/components/ui/GlassCard";
+import { formatIDR } from "@/lib/utils";
+import {
+  Users,
+  UserPlus,
+  Search,
+  BookOpen,
+  UserCheck,
+  Plus,
+  X,
+  CheckCircle2,
+  Trash2,
+  Edit,
+  Loader2,
+} from "lucide-react";
 
-export default async function AdminSantriPage() {
-  // TODO (Atnan): Ambil data Santri, Kelas, Wali, dan konfigurasi Beasiswa dari DB.
+export default function AdminSantriPage() {
+  const [loading, setLoading] = useState(false);
+  const [santriList, setSantriList] = useState<any[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+
+  // Form State
+  const [nisn, setNisn] = useState("");
+  const [nama, setNama] = useState("");
+  const [kelas, setKelas] = useState("7A");
+  const [namaWali, setNamaWali] = useState("");
+  const [noHpWali, setNoHpWali] = useState("");
+  const [potongan, setPotongan] = useState("0");
+
+  const filteredSantri = santriList.filter(
+    (s) =>
+      s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      s.nisn.includes(searchQuery)
+  );
+
+  const handleAddSantri = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!nama || !nisn) return;
+
+    const newSantri = {
+      id: String(Date.now()),
+      nisn,
+      name: nama,
+      kelas: { name: kelas },
+      wali: { user: { name: namaWali || "Wali " + nama, phone: noHpWali || "08123456789" } },
+      potonganTetap: Number(potongan) || 0,
+    };
+
+    setSantriList([newSantri, ...santriList]);
+    setIsAddModalOpen(false);
+    // Reset Form
+    setNisn("");
+    setNama("");
+    setNamaWali("");
+    setNoHpWali("");
+    setPotongan("0");
+  };
 
   return (
-    <div className="admin-santri-container">
-      <MacWindowHeader title="Kelola Data Santri & Wali Murid" />
+    <div className="app-container">
+      <SidebarNav activeItem="SANTRI" userRole="ADMINISTRATOR" userName="Admin Tata Usaha" />
 
-      <div className="page-actions">
-        {/* TODO (Usva): Tambahkan tombol Tambah Santri, Tambah Kelas, dll */}
-        <button className="mac-btn mac-btn-primary">Tambah Santri Baru</button>
-      </div>
+      <main className="main-content" style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
+        <TopHeader title="SISTEM KEUANGAN INSTITUSI - PORTAL ADMINISTRATOR TU" />
 
-      <GlassCard className="table-card">
-        {/* 
-          TODO (Usva): Desain tabel santri dengan kolom:
-          NISN | Nama Santri | Kelas | Wali Murid | Beasiswa/Potongan | Aksi
-        */}
-        <table className="mac-table">
-          <thead>
-            <tr>
-              <th>NISN</th>
-              <th>Nama Santri</th>
-              <th>Kelas</th>
-              <th>Wali Murid</th>
-              <th>Potongan SPP</th>
-              <th>Aksi</th>
-            </tr>
-          </thead>
-          <tbody>
-            {/* Loop data santri dari Atnan */}
-            <tr className="empty-row">
-              <td colSpan={6} style={{ textAlign: "center" }}>Belum ada data santri.</td>
-            </tr>
-          </tbody>
-        </table>
-      </GlassCard>
+        <div className="page-body" style={{ padding: "1.75rem 2rem", maxWidth: "1400px", margin: "0 auto", width: "100%", display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+          
+          {/* Header Bar */}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div>
+              <div style={{ fontSize: "0.72rem", fontWeight: 800, letterSpacing: "0.1em", color: "var(--text-muted)", textTransform: "uppercase" }}>
+                MASTER DATA KESISWAAN
+              </div>
+              <h1 style={{ fontSize: "1.75rem", fontWeight: 800, color: "var(--text-main)", marginTop: "0.2rem" }}>
+                Kelola Data Santri & Wali Murid
+              </h1>
+            </div>
+
+            <button
+              onClick={() => setIsAddModalOpen(true)}
+              style={{
+                padding: "0.65rem 1.25rem",
+                fontSize: "0.85rem",
+                fontWeight: 700,
+                backgroundColor: "var(--primary)",
+                color: "#ffffff",
+                border: "none",
+                borderRadius: "6px",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: "0.5rem",
+                boxShadow: "0 2px 8px rgba(21, 69, 57, 0.25)",
+              }}
+            >
+              <UserPlus size={18} /> Tambah Santri Baru
+            </button>
+          </div>
+
+          {/* Search & Filter Bar */}
+          <div className="glass-card" style={{ padding: "1rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div style={{ position: "relative", width: "320px", display: "flex", alignItems: "center" }}>
+              <Search size={16} style={{ position: "absolute", left: "0.75rem", color: "var(--text-muted)" }} />
+              <input
+                type="text"
+                placeholder="Cari Nama Santri / NISN..."
+                style={{
+                  width: "100%",
+                  paddingLeft: "2.25rem",
+                  paddingRight: "0.85rem",
+                  paddingTop: "0.5rem",
+                  paddingBottom: "0.5rem",
+                  border: "1px solid var(--border-glass)",
+                  borderRadius: "6px",
+                  backgroundColor: "var(--bg-app)",
+                  color: "var(--text-main)",
+                  fontSize: "0.85rem",
+                  outline: "none",
+                }}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+
+            <div style={{ fontSize: "0.85rem", fontWeight: 700, color: "var(--text-muted)" }}>
+              Total Santri: <span style={{ color: "var(--primary)", fontWeight: 800 }}>{santriList.length} Santri</span>
+            </div>
+          </div>
+
+          {/* Santri Table */}
+          <div style={{ backgroundColor: "#ffffff", border: "1px solid var(--border-glass)", borderRadius: "8px", overflow: "hidden", boxShadow: "0 4px 12px rgba(0, 0, 0, 0.05)" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "0.88rem" }}>
+              <thead>
+                <tr style={{ backgroundColor: "#f7f3eb", borderBottom: "1px solid var(--border-glass)" }}>
+                  <th style={{ padding: "0.85rem 1rem", fontSize: "0.75rem", fontWeight: 800, color: "#516071", textTransform: "uppercase" }}>NISN</th>
+                  <th style={{ padding: "0.85rem 1rem", fontSize: "0.75rem", fontWeight: 800, color: "#516071", textTransform: "uppercase" }}>Nama Santri</th>
+                  <th style={{ padding: "0.85rem 1rem", fontSize: "0.75rem", fontWeight: 800, color: "#516071", textTransform: "uppercase" }}>Kelas</th>
+                  <th style={{ padding: "0.85rem 1rem", fontSize: "0.75rem", fontWeight: 800, color: "#516071", textTransform: "uppercase" }}>Wali Murid (No. HP)</th>
+                  <th style={{ padding: "0.85rem 1rem", fontSize: "0.75rem", fontWeight: 800, color: "#516071", textTransform: "uppercase" }}>Potongan SPP</th>
+                  <th style={{ padding: "0.85rem 1rem", fontSize: "0.75rem", fontWeight: 800, color: "#516071", textTransform: "uppercase", textAlign: "center" }}>Aksi</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredSantri.length > 0 ? (
+                  filteredSantri.map((s) => (
+                    <tr key={s.id} style={{ borderBottom: "1px solid var(--border-glass)" }}>
+                      <td style={{ padding: "0.9rem 1rem", fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, color: "var(--primary)" }}>{s.nisn}</td>
+                      <td style={{ padding: "0.9rem 1rem", fontWeight: 700, color: "var(--text-main)" }}>{s.name}</td>
+                      <td style={{ padding: "0.9rem 1rem", color: "var(--text-muted)" }}>{s.kelas?.name || "-"}</td>
+                      <td style={{ padding: "0.9rem 1rem", color: "var(--text-main)" }}>
+                        <div style={{ fontWeight: 600 }}>{s.wali?.user?.name || "-"}</div>
+                        <div style={{ fontSize: "0.75rem", color: "var(--text-dim)" }}>{s.wali?.user?.phone || "-"}</div>
+                      </td>
+                      <td style={{ padding: "0.9rem 1rem", fontWeight: 700, color: "var(--status-lunas)" }}>
+                        {s.potonganTetap > 0 ? formatIDR(s.potonganTetap) : "-"}
+                      </td>
+                      <td style={{ padding: "0.9rem 1rem", textAlign: "center" }}>
+                        <button
+                          onClick={() => setSantriList(santriList.filter((x) => x.id !== s.id))}
+                          style={{
+                            padding: "0.35rem 0.6rem",
+                            fontSize: "0.75rem",
+                            backgroundColor: "var(--status-ditolak-bg)",
+                            color: "var(--status-ditolak)",
+                            border: "1px solid var(--status-ditolak)",
+                            borderRadius: "4px",
+                            cursor: "pointer",
+                          }}
+                        >
+                          Hapus
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={6} style={{ padding: "3rem", textAlign: "center", color: "var(--text-muted)", fontSize: "0.9rem" }}>
+                      Belum ada data santri. Klik <strong>"Tambah Santri Baru"</strong> di atas untuk menambahkan santri dari nol.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </main>
+
+      {/* Modal Tambah Santri */}
+      {isAddModalOpen && (
+        <div className="modal-overlay" onClick={() => setIsAddModalOpen(false)}>
+          <div className="glass-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: "500px", width: "100%", padding: "1.5rem" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.25rem", borderBottom: "1px solid var(--border-glass)", paddingBottom: "0.75rem" }}>
+              <h3 style={{ fontSize: "1.1rem", fontWeight: 800, color: "var(--text-main)" }}>
+                Tambah Data Santri Baru
+              </h3>
+              <button onClick={() => setIsAddModalOpen(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-main)" }}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddSantri} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+              <div>
+                <label style={{ fontSize: "0.75rem", fontWeight: 800, textTransform: "uppercase", color: "var(--text-muted)" }}>NISN Santri</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Contoh: 1234567890"
+                  value={nisn}
+                  onChange={(e) => setNisn(e.target.value)}
+                  style={{ width: "100%", padding: "0.6rem", border: "1px solid var(--border-glass)", borderRadius: "4px", marginTop: "0.2rem" }}
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: "0.75rem", fontWeight: 800, textTransform: "uppercase", color: "var(--text-muted)" }}>Nama Lengkap Santri</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Contoh: Muhammad Santri"
+                  value={nama}
+                  onChange={(e) => setNama(e.target.value)}
+                  style={{ width: "100%", padding: "0.6rem", border: "1px solid var(--border-glass)", borderRadius: "4px", marginTop: "0.2rem" }}
+                />
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+                <div>
+                  <label style={{ fontSize: "0.75rem", fontWeight: 800, textTransform: "uppercase", color: "var(--text-muted)" }}>Kelas</label>
+                  <select
+                    value={kelas}
+                    onChange={(e) => setKelas(e.target.value)}
+                    style={{ width: "100%", padding: "0.6rem", border: "1px solid var(--border-glass)", borderRadius: "4px", marginTop: "0.2rem" }}
+                  >
+                    <option value="7A">Kelas 7A</option>
+                    <option value="7B">Kelas 7B</option>
+                    <option value="8A">Kelas 8A</option>
+                    <option value="8B">Kelas 8B</option>
+                    <option value="9A">Kelas 9A</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ fontSize: "0.75rem", fontWeight: 800, textTransform: "uppercase", color: "var(--text-muted)" }}>Potongan SPP (Rp)</label>
+                  <input
+                    type="number"
+                    placeholder="0"
+                    value={potongan}
+                    onChange={(e) => setPotongan(e.target.value)}
+                    style={{ width: "100%", padding: "0.6rem", border: "1px solid var(--border-glass)", borderRadius: "4px", marginTop: "0.2rem" }}
+                  />
+                </div>
+              </div>
+
+              <hr style={{ border: "none", borderTop: "1px solid var(--border-glass)", margin: "0.5rem 0" }} />
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+                <div>
+                  <label style={{ fontSize: "0.75rem", fontWeight: 800, textTransform: "uppercase", color: "var(--text-muted)" }}>Nama Wali Murid</label>
+                  <input
+                    type="text"
+                    placeholder="Nama Orang Tua"
+                    value={namaWali}
+                    onChange={(e) => setNamaWali(e.target.value)}
+                    style={{ width: "100%", padding: "0.6rem", border: "1px solid var(--border-glass)", borderRadius: "4px", marginTop: "0.2rem" }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ fontSize: "0.75rem", fontWeight: 800, textTransform: "uppercase", color: "var(--text-muted)" }}>No. HP Wali (Login)</label>
+                  <input
+                    type="text"
+                    placeholder="0812xxxxxxxx"
+                    value={noHpWali}
+                    onChange={(e) => setNoHpWali(e.target.value)}
+                    style={{ width: "100%", padding: "0.6rem", border: "1px solid var(--border-glass)", borderRadius: "4px", marginTop: "0.2rem" }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem", marginTop: "1rem" }}>
+                <button
+                  type="button"
+                  onClick={() => setIsAddModalOpen(false)}
+                  style={{ padding: "0.6rem 1.25rem", border: "1px solid var(--border-glass)", borderRadius: "4px", background: "none", cursor: "pointer" }}
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  style={{ padding: "0.6rem 1.25rem", border: "none", borderRadius: "4px", backgroundColor: "var(--primary)", color: "#fff", fontWeight: 700, cursor: "pointer" }}
+                >
+                  Simpan Santri
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
