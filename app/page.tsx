@@ -6,6 +6,7 @@
 //            - Jika login sebagai ADMIN -> Redirect ke `/admin/dashboard`.
 //            - Jika login sebagai BENDAHARA -> Redirect ke `/bendahara/dashboard`.
 //            - Jika login sebagai WALIMURID -> Redirect ke `/wali/dashboard`.
+//            - Jika login sebagai KOPERASI -> Redirect ke `/koperasi/dashboard`.
 // =========================================================================
 
 import { redirect } from "next/navigation";
@@ -28,6 +29,8 @@ export default async function IndexPage() {
       redirect("/bendahara/dashboard");
     case "WALIMURID":
       redirect("/wali/dashboard");
+    case "KOPERASI":
+      redirect("/koperasi/dashboard");
     default:
       redirect("/login");
   }

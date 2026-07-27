@@ -8,17 +8,18 @@ datasource db {
 }
 
 model User {
-  id            String         @id @default(uuid()) @db.Uuid
-  username      String         @unique
-  email         String?        @unique
-  phone         String?        @unique
-  passwordHash  String
-  name          String
-  role          UserRole
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  wali          WaliMurid?
-  notifications Notification[]
+  id              String              @id @default(uuid()) @db.Uuid
+  username        String              @unique
+  email           String?             @unique
+  phone           String?             @unique
+  passwordHash    String
+  name            String
+  role            UserRole
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  wali            WaliMurid?
+  notifications   Notification[]
+  transaksiKasir  TransaksiKoperasi[]
 }
 
 model WaliMurid {
@@ -36,22 +37,28 @@ model Kelas {
 }
 
 model TahunAjaran {
-  id       String   @id @default(uuid()) @db.Uuid
-  year     String   @unique
-  isActive Boolean  @default(false)
+  id       String    @id @default(uuid()) @db.Uuid
+  year     String    @unique
+  isActive Boolean   @default(false)
   tagihan  Tagihan[]
 }
 
 model Siswa {
-  id            String    @id @default(uuid()) @db.Uuid
-  nisn          String    @unique
+  id            String              @id @default(uuid()) @db.Uuid
+  nisn          String              @unique
   name          String
-  kelas         Kelas     @relation(fields: [kelasId], references: [id])
-  kelasId       String    @db.Uuid
-  wali          WaliMurid @relation(fields: [waliId], references: [id])
-  waliId        String    @db.Uuid
-  potonganTetap Decimal   @default("0.0")
+  kelas         Kelas               @relation(fields: [kelasId], references: [id])
+  kelasId       String              @db.Uuid
+  wali          WaliMurid           @relation(fields: [waliId], references: [id])
+  waliId        String              @db.Uuid
+  potonganTetap Decimal             @default("0.0")
   tagihan       Tagihan[]
+
+  // Feature E-Wallet Uang Saku & Koperasi
+  saldoSaku     Decimal             @default("0.0")
+  limitHarian   Decimal             @default("20000.0")
+  topupSaku     TopupSaku[]
+  transaksiMart TransaksiKoperasi[]
 }
 
 model JenisTagihan {
@@ -83,17 +90,42 @@ model Tagihan {
 }
 
 model Pembayaran {
-  id              String   @id @default(uuid()) @db.Uuid
-  tagihan         Tagihan  @relation(fields: [tagihanId], references: [id])
-  tagihanId       String   @unique @db.Uuid
-  buktiUrl        String?
-  catatanWali     String?
-  catatanAdmin    String?
+  id               String    @id @default(uuid()) @db.Uuid
+  tagihan          Tagihan   @relation(fields: [tagihanId], references: [id])
+  tagihanId        String    @unique @db.Uuid
+  buktiUrl         String?
+  catatanWali      String?
+  catatanAdmin     String?
   catatanBendahara String?
-  verifiedAt      DateTime?
-  approvedAt      DateTime?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  verifiedAt       DateTime?
+  approvedAt       DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+}
+
+model TopupSaku {
+  id           String      @id @default(uuid()) @db.Uuid
+  siswa        Siswa       @relation(fields: [siswaId], references: [id])
+  siswaId      String      @db.Uuid
+  nominal      Decimal
+  buktiUrl     String?
+  status       TopupStatus @default(MENUNGGU_VERIFIKASI)
+  catatanWali  String?
+  catatanAdmin String?
+  verifiedAt   DateTime?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+}
+
+model TransaksiKoperasi {
+  id            String   @id @default(uuid()) @db.Uuid
+  siswa         Siswa    @relation(fields: [siswaId], references: [id])
+  siswaId       String   @db.Uuid
+  kasir         User     @relation(fields: [kasirId], references: [id])
+  kasirId       String   @db.Uuid
+  totalBelanja  Decimal
+  catatanBarang String?
+  createdAt     DateTime @default(now())
 }
 
 model Notification {
@@ -110,6 +142,7 @@ enum UserRole {
   ADMIN
   WALIMURID
   BENDAHARA
+  KOPERASI
 }
 
 enum TagihanType {
@@ -124,4 +157,10 @@ enum TagihanStatus {
   LUNAS
   DITOLAK_ADMIN
   DITOLAK_BENDAHARA
+}
+
+enum TopupStatus {
+  MENUNGGU_VERIFIKASI
+  BERHASIL
+  DITOLAK
 }

@@ -68,7 +68,7 @@ export const authOptions: AuthOptions = {
                 { username: identifier },
                 { email: identifier },
               ],
-              role: { in: ["ADMIN", "BENDAHARA"] },
+              role: { in: ["ADMIN", "BENDAHARA", "KOPERASI"] },
             },
           });
         }

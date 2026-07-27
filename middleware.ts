@@ -27,6 +27,11 @@ export default withAuth(
     if (path.startsWith("/wali") && token?.role !== "WALIMURID") {
       return NextResponse.redirect(new URL("/login?error=UnauthorizedWali", req.url));
     }
+
+    // Proteksi Rute Kasir Koperasi / Mart Sekolah
+    if (path.startsWith("/koperasi") && token?.role !== "KOPERASI") {
+      return NextResponse.redirect(new URL("/login?error=UnauthorizedKoperasi", req.url));
+    }
   },
   {
     callbacks: {
@@ -41,5 +46,6 @@ export const config = {
     "/admin/:path*",
     "/bendahara/:path*",
     "/wali/:path*",
+    "/koperasi/:path*",
   ],
 };
