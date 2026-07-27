@@ -39,7 +39,7 @@ export default function AdminSantriPage() {
   // Form State
   const [nisn, setNisn] = useState("");
   const [nama, setNama] = useState("");
-  const [kelas, setKelas] = useState("7A");
+  const [kelas, setKelas] = useState("");
   const [namaWali, setNamaWali] = useState("");
   const [noHpWali, setNoHpWali] = useState("");
   const [potongan, setPotongan] = useState("0");
@@ -302,7 +302,7 @@ export default function AdminSantriPage() {
                     style={{ width: "100%", padding: "0.6rem", border: "1px solid var(--border-glass)", borderRadius: "4px", marginTop: "0.2rem" }}
                   />
                   <datalist id="kelas-suggestions">
-                    {Array.from(new Set(["7A", "7B", "8A", "8B", "9A", "10 IPA", "11 IPS", ...santriList.map((s) => s.kelas?.name).filter(Boolean)])).map((k) => (
+                    {Array.from(new Set([...kelasList.map((k) => k.name), ...santriList.map((s) => s.kelas?.name).filter(Boolean)])).map((k) => (
                       <option key={k} value={k} />
                     ))}
                   </datalist>

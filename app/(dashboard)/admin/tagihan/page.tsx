@@ -14,6 +14,7 @@ import { generateMonthlyBills, createManualBill } from "@/lib/actions/tagihan";
 import { getTahunAjaranList, getActiveTahunAjaran, createTahunAjaran } from "@/lib/actions/tahun-ajaran";
 import { getJenisTagihanList, createJenisTagihan } from "@/lib/actions/jenis-tagihan";
 import { getSantriList } from "@/lib/actions/santri";
+import { getKelasList } from "@/lib/actions/kelas";
 import {
   Receipt,
   Calendar,
@@ -42,18 +43,21 @@ export default function AdminTagihanPage() {
   const [activeTahun, setActiveTahun] = useState<any>(null);
   const [jenisSPP, setJenisSPP] = useState<any>(null);
   const [santriList, setSantriList] = useState<any[]>([]);
+  const [kelasList, setKelasList] = useState<any[]>([]);
 
   useEffect(() => {
     async function initData() {
       try {
-        const [tActive, jList, sList] = await Promise.all([
+        const [tActive, jList, sList, kList] = await Promise.all([
           getActiveTahunAjaran(),
           getJenisTagihanList(),
           getSantriList(),
+          getKelasList(),
         ]);
 
         setActiveTahun(tActive);
         setSantriList(sList);
+        setKelasList(kList);
 
         const spp = jList.find((j: any) => j.type === "BULANAN");
         setJenisSPP(spp);
@@ -297,9 +301,11 @@ export default function AdminTagihanPage() {
                       style={{ width: "100%", padding: "0.65rem 0.85rem", border: "1px solid var(--border-glass)", borderRadius: "6px", backgroundColor: "var(--bg-app)", fontSize: "0.88rem", marginTop: "0.2rem" }}
                     >
                       <option value="SEMUA">Seluruh Santri</option>
-                      <option value="7A">Khusus Kelas 7A</option>
-                      <option value="7B">Khusus Kelas 7B</option>
-                      <option value="8A">Khusus Kelas 8A</option>
+                      {kelasList.map((k) => (
+                        <option key={k.id} value={k.name}>
+                          Khusus Kelas {k.name}
+                        </option>
+                      ))}
                     </select>
                   </div>
                 </div>
