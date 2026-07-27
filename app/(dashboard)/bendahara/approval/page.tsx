@@ -47,10 +47,10 @@ export default function BendaharaApprovalPage() {
 
   const handleApprove = async (item: any) => {
     try {
-      const res = await bendaharaApprovePayment(item.id);
+      await bendaharaApprovePayment({ pembayaranId: item.id, action: "approve" });
 
       setReceiptData({
-        receiptNo: res.nomorKwitansi || `KW-${Date.now().toString().slice(-6)}`,
+        receiptNo: `KW-${item.id.slice(-6).toUpperCase()}`,
         date: new Date().toISOString().split("T")[0],
         receivedFrom: item.tagihan?.siswa?.wali?.user?.name || "Wali Santri",
         studentName: item.tagihan?.siswa?.name || "Santri",

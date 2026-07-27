@@ -102,7 +102,7 @@ export default function AdminVerifikasiPage() {
   const handleApprove = async () => {
     if (!selectedItem) return;
     try {
-      await adminVerifyPayment(selectedItem.id, true);
+      await adminVerifyPayment({ pembayaranId: selectedItem.id, action: "approve" });
 
       const receiptData: DigitalReceiptData = {
         receiptNo: `KW-${selectedItem.refNo.replace("REF-", "")}`,
@@ -131,7 +131,11 @@ export default function AdminVerifikasiPage() {
     }
 
     try {
-      await adminVerifyPayment(selectedItem.id, false, rejectionReason.trim());
+      await adminVerifyPayment({
+        pembayaranId: selectedItem.id,
+        action: "reject",
+        catatan: rejectionReason.trim(),
+      });
       setRejectionModalOpen(false);
       setRejectionReason("");
       await loadData();

@@ -330,7 +330,7 @@ export default function AdminPengaturanPage() {
                       <label style={{ fontSize: "0.75rem", fontWeight: 800, textTransform: "uppercase", color: "var(--text-muted)" }}>Tipe Tagihan</label>
                       <select
                         value={jenisType}
-                        onChange={(e) => setJenisType(e.target.value)}
+                        onChange={(e) => setJenisType(e.target.value as "BULANAN" | "TAHUNAN")}
                         style={{ width: "100%", padding: "0.6rem", border: "1px solid var(--border-glass)", borderRadius: "4px", marginTop: "0.2rem" }}
                       >
                         <option value="BULANAN">Bulanan</option>
