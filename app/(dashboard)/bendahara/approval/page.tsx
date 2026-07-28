@@ -55,10 +55,10 @@ export default function BendaharaApprovalPage() {
         receivedFrom: item.tagihan?.siswa?.wali?.user?.name || "Wali Santri",
         studentName: item.tagihan?.siswa?.name || "Santri",
         studentClass: item.tagihan?.siswa?.kelas?.name || "-",
-        amount: Number(item.amountPaid) || 250000,
+        amount: Number(item.tagihan?.nominalAkhir) || 0,
         paymentFor: item.tagihan?.jenisTagihan?.name || "SPP Bulanan",
         verifiedBy: "Bendahara Pesantren",
-        paymentMethod: item.paymentMethod || "Bank Transfer",
+        paymentMethod: item.catatanWali || "Bank Transfer",
       });
       setReceiptModalOpen(true);
       await loadData();
@@ -105,7 +105,7 @@ export default function BendaharaApprovalPage() {
                         <div style={{ fontSize: "0.75rem", color: "var(--text-dim)" }}>{item.tagihan?.siswa?.kelas?.name || item.studentClass}</div>
                       </td>
                       <td style={{ padding: "0.9rem 1rem", color: "var(--text-main)" }}>{item.tagihan?.jenisTagihan?.name || item.tagihan}</td>
-                      <td style={{ padding: "0.9rem 1rem", fontWeight: 800, color: "var(--primary)" }}>{formatIDR(Number(item.amountPaid) || item.nominal || 0)}</td>
+                      <td style={{ padding: "0.9rem 1rem", fontWeight: 800, color: "var(--primary)" }}>{formatIDR(Number(item.tagihan?.nominalAkhir) || 0)}</td>
                       <td style={{ padding: "0.9rem 1rem", color: "var(--status-lunas)" }}>✓ Admin TU</td>
                       <td style={{ padding: "0.9rem 1rem", textAlign: "center" }}>
                         <button
