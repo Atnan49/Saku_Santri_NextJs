@@ -50,6 +50,12 @@ export default function AdminVerifikasiPage() {
   const [receiptModalOpen, setReceiptModalOpen] = useState(false);
   const [generatedReceiptData, setGeneratedReceiptData] = useState<DigitalReceiptData | null>(null);
 
+  const [imageError, setImageError] = useState(false);
+
+  useEffect(() => {
+    setImageError(false);
+  }, [selectedId]);
+
   const loadData = async () => {
     setLoading(true);
     try {
@@ -447,10 +453,11 @@ export default function AdminVerifikasiPage() {
                     }}
                     onClick={() => setFullImageModalOpen(true)}
                   >
-                    {selectedItem.proofImageUrl ? (
+                    {selectedItem.proofImageUrl && !imageError && !selectedItem.proofImageUrl.toLowerCase().endsWith(".pdf") ? (
                       <img
                         src={selectedItem.proofImageUrl}
                         alt={`Bukti Transfer ${selectedItem.refNo}`}
+                        onError={() => setImageError(true)}
                         style={{ width: "100%", maxHeight: "300px", objectFit: "contain", borderRadius: "6px" }}
                       />
                     ) : (
@@ -462,6 +469,17 @@ export default function AdminVerifikasiPage() {
                         <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "0.2rem" }}>
                           {selectedItem.paymentMethod} • Rp {selectedItem.reportedAmount.toLocaleString("id-ID")}
                         </div>
+                        {selectedItem.proofImageUrl && (
+                          <a
+                            href={selectedItem.proofImageUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            style={{ display: "inline-block", marginTop: "0.75rem", padding: "0.4rem 0.85rem", fontSize: "0.75rem", fontWeight: 700, backgroundColor: "var(--primary)", color: "#fff", borderRadius: "4px", textDecoration: "none" }}
+                          >
+                            Buka Berkas Bukti (Tab Baru)
+                          </a>
+                        )}
                       </div>
                     )}
                   </div>
@@ -544,10 +562,11 @@ export default function AdminVerifikasiPage() {
               </button>
             </div>
             <div style={{ minHeight: "350px", maxHeight: "75vh", backgroundColor: "rgba(255, 255, 255, 0.02)", border: "1px solid var(--border-glass)", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
-              {selectedItem.proofImageUrl ? (
+              {selectedItem.proofImageUrl && !imageError && !selectedItem.proofImageUrl.toLowerCase().endsWith(".pdf") ? (
                 <img
                   src={selectedItem.proofImageUrl}
                   alt={`Bukti Transfer ${selectedItem.refNo}`}
+                  onError={() => setImageError(true)}
                   style={{ maxWidth: "100%", maxHeight: "70vh", objectFit: "contain" }}
                 />
               ) : (
@@ -557,6 +576,16 @@ export default function AdminVerifikasiPage() {
                   <div style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginTop: "0.3rem" }}>
                     Metode: {selectedItem.paymentMethod} | Nominal: {formatIDR(selectedItem.reportedAmount)}
                   </div>
+                  {selectedItem.proofImageUrl && (
+                    <a
+                      href={selectedItem.proofImageUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{ display: "inline-block", marginTop: "1rem", padding: "0.58rem 1.2rem", fontSize: "0.85rem", fontWeight: 700, backgroundColor: "var(--primary)", color: "#fff", borderRadius: "6px", textDecoration: "none" }}
+                    >
+                      Buka Berkas Bukti Transfer (Tab Baru)
+                    </a>
+                  )}
                 </div>
               )}
             </div>

@@ -7,6 +7,7 @@ import { submitPaymentProof } from "@/lib/actions/pembayaran";
 import { UploadCloud, CheckCircle2, ArrowLeft, Loader2, AlertCircle } from "lucide-react";
 import Link from "next/link";
 import StatusBadge from "@/components/ui/StatusBadge";
+import { convertImageToWebP } from "@/lib/image-converter";
 
 export default function WaliUploadPembayaranPage({ params }: { params: { id: string } }) {
   const [tagihan, setTagihan] = useState<any>(null);
@@ -14,6 +15,7 @@ export default function WaliUploadPembayaranPage({ params }: { params: { id: str
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [converting, setConverting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [note, setNote] = useState("");
   const [refNo, setRefNo] = useState("");
@@ -37,11 +39,21 @@ export default function WaliUploadPembayaranPage({ params }: { params: { id: str
     fetchBill();
   }, [params.id]);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      const selectedFile = e.target.files[0];
-      setFile(selectedFile);
-      setPreviewUrl(URL.createObjectURL(selectedFile));
+      const originalFile = e.target.files[0];
+      setConverting(true);
+      try {
+        // Auto convert ke WebP
+        const webpFile = await convertImageToWebP(originalFile);
+        setFile(webpFile);
+        setPreviewUrl(URL.createObjectURL(webpFile));
+      } catch (err) {
+        setFile(originalFile);
+        setPreviewUrl(URL.createObjectURL(originalFile));
+      } finally {
+        setConverting(false);
+      }
     }
   };
 
@@ -53,7 +65,7 @@ export default function WaliUploadPembayaranPage({ params }: { params: { id: str
     setErrorMsg(null);
 
     try {
-      // 1. Upload ke /api/upload
+      // 1. Upload ke /api/upload (mengirimkan berkas webp)
       const formData = new FormData();
       formData.append("file", file);
 
