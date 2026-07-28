@@ -418,3 +418,218 @@ export async function deleteTagihan(id: string) {
   revalidatePath("/admin/dashboard");
   return { success: true };
 }
+
+// ========== ADMIN FULL CONTROL: DIRECT CASH PAYMENT (MEJA TU) ==========
+
+export async function adminDirectCashPayment(data: {
+  tagihanId: string;
+  nominalSetoran: number;
+  catatan?: string;
+}) {
+  const session = await requireAdmin();
+
+  if (data.nominalSetoran <= 0) {
+    throw new Error("Nominal setoran tunai harus lebih dari 0.");
+  }
+
+  const tagihan = await (prisma as any).tagihan.findUnique({
+    where: { id: data.tagihanId },
+    include: {
+      siswa: {
+        include: {
+          wali: { include: { user: { select: { id: true, name: true, phone: true } } } },
+          kelas: { select: { name: true } },
+        },
+      },
+      jenisTagihan: { select: { name: true } },
+    },
+  });
+
+  if (!tagihan) {
+    throw new Error("Tagihan tidak ditemukan.");
+  }
+
+  const nominalAkhir = Number(tagihan.nominalAkhir);
+  const prevTerbayar = Number(tagihan.nominalTerbayar || 0);
+  const sisa = Math.max(0, nominalAkhir - prevTerbayar);
+
+  if (sisa <= 0 || tagihan.status === "LUNAS") {
+    throw new Error("Tagihan ini sudah LUNAS.");
+  }
+
+  if (data.nominalSetoran > sisa) {
+    throw new Error(`Nominal setoran (Rp ${data.nominalSetoran.toLocaleString("id-ID")}) melebihi sisa tagihan (Rp ${sisa.toLocaleString("id-ID")}).`);
+  }
+
+  const newTerbayar = prevTerbayar + data.nominalSetoran;
+  const isFullyPaid = newTerbayar >= nominalAkhir;
+  const finalStatus = isFullyPaid ? "LUNAS" : "DIBAYAR_SEBAGIAN";
+
+  // Buat record pembayaran langsung LUNAS/Verified
+  const pembayaran = await (prisma as any).pembayaran.create({
+    data: {
+      tagihanId: data.tagihanId,
+      nominalDisetor: data.nominalSetoran,
+      buktiUrl: "/uploads/cash_tu.png", // Marker pembayaran tunai TU
+      catatanWali: "Pembayaran Tunai di Kasir TU",
+      catatanAdmin: data.catatan || "Setoran Tunai di Kantor Tata Usaha.",
+      catatanBendahara: "Disetujui oleh Admin TU (Setoran Tunai).",
+      verifiedAt: new Date(),
+      verifiedByUserId: session.user.id,
+      approvedAt: new Date(),
+      approvedByUserId: session.user.id,
+    },
+  });
+
+  // Update tagihan
+  await (prisma as any).tagihan.update({
+    where: { id: data.tagihanId },
+    data: {
+      nominalTerbayar: newTerbayar,
+      status: finalStatus,
+    },
+  });
+
+  // Audit Log
+  await (prisma as any).auditLog.create({
+    data: {
+      userId: session.user.id,
+      action: "CASH_PAYMENT_TU",
+      entityType: "Tagihan",
+      entityId: tagihan.id,
+      details: JSON.stringify({
+        nominalSetoran: data.nominalSetoran,
+        newTerbayar,
+        finalStatus,
+        catatan: data.catatan,
+      }),
+    },
+  });
+
+  revalidatePath("/admin/tagihan");
+  revalidatePath("/admin/dashboard");
+  revalidatePath("/bendahara/approval");
+  revalidatePath("/bendahara/dashboard");
+  revalidatePath("/wali/dashboard");
+
+  return {
+    success: true,
+    message: isFullyPaid
+      ? "Pembayaran tunai berhasil dicatat. Tagihan berstatus LUNAS!"
+      : `Pembayaran tunai Rp ${data.nominalSetoran.toLocaleString("id-ID")} berhasil dicatat (Cicilan).`,
+    pembayaranId: pembayaran.id,
+  };
+}
+
+// ========== ADMIN FULL CONTROL: UPDATE BILL DETAILS ==========
+
+export async function adminUpdateBill(
+  id: string,
+  data: {
+    nominalAkhir?: number;
+    dueDate?: string;
+    period?: string;
+    catatanTagihan?: string;
+  }
+) {
+  const session = await requireAdmin();
+
+  const tagihan = await (prisma as any).tagihan.findUnique({
+    where: { id },
+  });
+
+  if (!tagihan) {
+    throw new Error("Tagihan tidak ditemukan.");
+  }
+
+  const updateData: any = {};
+  if (data.nominalAkhir !== undefined) {
+    if (data.nominalAkhir < 0) throw new Error("Nominal tagihan tidak boleh negatif.");
+    updateData.nominalAkhir = data.nominalAkhir;
+    
+    // Perbarui status jika nominal terbayar sudah mencukupi
+    const terbayar = Number(tagihan.nominalTerbayar || 0);
+    if (terbayar >= data.nominalAkhir && data.nominalAkhir > 0) {
+      updateData.status = "LUNAS";
+    }
+  }
+
+  if (data.dueDate) updateData.dueDate = new Date(data.dueDate);
+  if (data.period) updateData.period = data.period.trim();
+  if (data.catatanTagihan !== undefined) updateData.catatanTagihan = data.catatanTagihan.trim();
+
+  const updatedBill = await (prisma as any).tagihan.update({
+    where: { id },
+    data: updateData,
+  });
+
+  // Audit Log
+  await (prisma as any).auditLog.create({
+    data: {
+      userId: session.user.id,
+      action: "EDIT_BILL",
+      entityType: "Tagihan",
+      entityId: id,
+      details: JSON.stringify(updateData),
+    },
+  });
+
+  revalidatePath("/admin/tagihan");
+  revalidatePath("/admin/dashboard");
+  revalidatePath("/wali/dashboard");
+
+  return updatedBill;
+}
+
+// ========== ADMIN FULL CONTROL: VOID / CANCEL BILL ==========
+
+export async function adminVoidBill(id: string, alasan: string) {
+  const session = await requireAdmin();
+
+  if (!alasan || alasan.trim().length === 0) {
+    throw new Error("Alasan pembatalan tagihan wajib diisi.");
+  }
+
+  const tagihan = await (prisma as any).tagihan.findUnique({
+    where: { id },
+    include: { pembayaran: true },
+  });
+
+  if (!tagihan) {
+    throw new Error("Tagihan tidak ditemukan.");
+  }
+
+  // Audit log sebelum menghapus
+  await (prisma as any).auditLog.create({
+    data: {
+      userId: session.user.id,
+      action: "VOID_BILL",
+      entityType: "Tagihan",
+      entityId: id,
+      details: JSON.stringify({
+        alasan,
+        tagihanDetails: {
+          siswaId: tagihan.siswaId,
+          nominalAkhir: Number(tagihan.nominalAkhir),
+          status: tagihan.status,
+        },
+      }),
+    },
+  });
+
+  // Hapus semua record pembayaran terkait
+  await (prisma as any).pembayaran.deleteMany({
+    where: { tagihanId: id },
+  });
+
+  // Hapus tagihan
+  await (prisma as any).tagihan.delete({
+    where: { id },
+  });
+
+  revalidatePath("/admin/tagihan");
+  revalidatePath("/admin/dashboard");
+  revalidatePath("/wali/dashboard");
+
+  return { success: true, message: `Tagihan berhasil dibatalkan/dihapus. Alasan: ${alasan}` };
+}

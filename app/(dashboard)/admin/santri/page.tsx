@@ -12,7 +12,8 @@ import GlassCard from "@/components/ui/GlassCard";
 import { formatIDR } from "@/lib/utils";
 import { getSantriList, createSantri, updateSantri, deleteSantri } from "@/lib/actions/santri";
 import { getKelasList, createKelas } from "@/lib/actions/kelas";
-import { createWaliMuridUser } from "@/lib/actions/user";
+import { createWaliMuridUser, getWaliMuridList } from "@/lib/actions/user";
+import { adminTopUpCash, adminUpdateLimitHarian } from "@/lib/actions/uang-saku";
 import {
   Users,
   UserPlus,
@@ -25,6 +26,9 @@ import {
   Trash2,
   Edit,
   Loader2,
+  DollarSign,
+  Sliders,
+  Coins,
 } from "lucide-react";
 
 export default function AdminSantriPage() {
@@ -37,13 +41,23 @@ export default function AdminSantriPage() {
   const [editingSantriId, setEditingSantriId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
 
-  // Form State
+  // Form State Santri
   const [nisn, setNisn] = useState("");
   const [nama, setNama] = useState("");
   const [kelas, setKelas] = useState("");
   const [namaWali, setNamaWali] = useState("");
   const [noHpWali, setNoHpWali] = useState("");
   const [potongan, setPotongan] = useState("0");
+
+  // Full Control State: Topup Saku & Limit Jajan
+  const [topupModalSantri, setTopupModalSantri] = useState<any | null>(null);
+  const [topupNominal, setTopupNominal] = useState("");
+  const [topupCatatan, setTopupCatatan] = useState("");
+  const [submittingTopup, setSubmittingTopup] = useState(false);
+
+  const [limitModalSantri, setLimitModalSantri] = useState<any | null>(null);
+  const [limitNominal, setLimitNominal] = useState("");
+  const [submittingLimit, setSubmittingLimit] = useState(false);
 
   const loadData = async () => {
     setLoading(true);
@@ -99,40 +113,46 @@ export default function AdminSantriPage() {
     setErrorMessage("");
 
     try {
-      // 1. Cari atau buat Kelas (jika diisi)
-      let selectedKelasId = "";
-      if (kelas.trim()) {
-        let selectedKelas = kelasList.find((k) => k.name.toLowerCase() === kelas.trim().toLowerCase());
-        if (!selectedKelas) {
-          selectedKelas = await createKelas(kelas.trim());
-        }
-        selectedKelasId = selectedKelas.id;
+      let kelasObj = kelasList.find((k) => k.name.toLowerCase() === kelas.trim().toLowerCase());
+      if (!kelasObj && kelas.trim()) {
+        kelasObj = await createKelas(kelas.trim());
       }
 
       if (editingSantriId) {
-        // MODE EDIT
         await updateSantri(editingSantriId, {
           name: nama.trim(),
-          kelasId: selectedKelasId || undefined,
+          kelasId: kelasObj?.id,
+          waliName: namaWali.trim(),
+          waliPhone: noHpWali.trim(),
           potonganTetap: Number(potongan) || 0,
-          waliName: namaWali.trim() || undefined,
-          waliPhone: noHpWali.trim() || undefined,
         });
       } else {
-        // MODE TAMBAH BARU
-        const phoneClean = noHpWali.trim() || `08${Date.now().toString().slice(-9)}`;
-        const waliRes = await createWaliMuridUser({
-          phone: phoneClean,
-          name: namaWali.trim() || `Wali ${nama.trim()}`,
-          password: "wali123",
-        });
+        let waliId: string | undefined;
 
-        const autoNisn = `SNT-${new Date().getFullYear()}-${String(santriList.length + 1).padStart(4, "0")}`;
+        if (namaWali && noHpWali) {
+          const wUser = await createWaliMuridUser({
+            phone: noHpWali.trim(),
+            name: namaWali.trim(),
+            password: "Password123!",
+          });
+          waliId = wUser.waliId;
+        }
+
+        if (!waliId) {
+          // Gunakan wali murid pertama yang ada sebagai fallback jika tidak diisi
+          const existingWalis = await getWaliMuridList();
+          if (existingWalis.length > 0) {
+            waliId = existingWalis[0].id;
+          } else {
+            throw new Error("Wali murid wajib diisi. Silakan isi Nama & No HP Wali.");
+          }
+        }
+
         await createSantri({
-          nisn: autoNisn,
+          nisn: nisn.trim() || `SNT-${Date.now().toString().slice(-6)}`,
           name: nama.trim(),
-          kelasId: selectedKelasId,
-          waliId: waliRes.waliId!,
+          kelasId: kelasObj ? kelasObj.id : kelasList[0]?.id || "",
+          waliId: waliId!,
           potonganTetap: Number(potongan) || 0,
         });
       }
@@ -156,6 +176,55 @@ export default function AdminSantriPage() {
     }
   };
 
+  // Topup Tunai TU Handler
+  const handleOpenTopup = (s: any) => {
+    setTopupModalSantri(s);
+    setTopupNominal("");
+    setTopupCatatan("Top-up Tunai Kasir TU");
+  };
+
+  const handleSubmitTopup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!topupModalSantri || !topupNominal) return;
+    setSubmittingTopup(true);
+    try {
+      const res = await adminTopUpCash({
+        siswaId: topupModalSantri.id,
+        nominal: Number(topupNominal),
+        catatan: topupCatatan,
+      });
+      alert(res.message);
+      setTopupModalSantri(null);
+      await loadData();
+    } catch (err: any) {
+      alert(err.message || "Gagal melakukan topup tunai.");
+    } finally {
+      setSubmittingTopup(false);
+    }
+  };
+
+  // Limit Jajan Handler
+  const handleOpenLimit = (s: any) => {
+    setLimitModalSantri(s);
+    setLimitNominal(String(s.limitHarian || 20000));
+  };
+
+  const handleSubmitLimit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!limitModalSantri || !limitNominal) return;
+    setSubmittingLimit(true);
+    try {
+      await adminUpdateLimitHarian(limitModalSantri.id, Number(limitNominal));
+      alert(`Limit jajan harian ${limitModalSantri.name} berhasil diubah menjadi ${formatIDR(Number(limitNominal))}.`);
+      setLimitModalSantri(null);
+      await loadData();
+    } catch (err: any) {
+      alert(err.message || "Gagal mengubah limit harian.");
+    } finally {
+      setSubmittingLimit(false);
+    }
+  };
+
   return (
     <div className="app-container">
       <SidebarNav activeItem="SANTRI" userRole="ADMINISTRATOR" userName="Admin Tata Usaha" />
@@ -165,101 +234,101 @@ export default function AdminSantriPage() {
 
         <div className="page-body" style={{ padding: "1.75rem 2rem", maxWidth: "1400px", margin: "0 auto", width: "100%", display: "flex", flexDirection: "column", gap: "1.5rem" }}>
           
-          {/* Header Bar */}
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "1rem" }}>
             <div>
               <div style={{ fontSize: "0.72rem", fontWeight: 800, letterSpacing: "0.1em", color: "var(--text-muted)", textTransform: "uppercase" }}>
-                MASTER DATA KESISWAAN
+                MODUL MANAJEMEN MASTER DATA SANTRI
               </div>
               <h1 style={{ fontSize: "1.75rem", fontWeight: 800, color: "var(--text-main)", marginTop: "0.2rem" }}>
-                Kelola Data Santri & Wali Murid
+                Buku Besar Santri & Saku Digital
               </h1>
             </div>
 
             <button
               onClick={handleOpenAdd}
               style={{
-                padding: "0.65rem 1.25rem",
-                fontSize: "0.85rem",
-                fontWeight: 700,
+                padding: "0.75rem 1.25rem",
                 backgroundColor: "var(--primary)",
                 color: "#ffffff",
                 border: "none",
                 borderRadius: "6px",
+                fontWeight: 700,
                 cursor: "pointer",
                 display: "flex",
                 alignItems: "center",
                 gap: "0.5rem",
-                boxShadow: "0 2px 8px rgba(21, 69, 57, 0.25)",
+                fontSize: "0.88rem",
               }}
             >
               <UserPlus size={18} /> Tambah Santri Baru
             </button>
           </div>
 
-          {/* Search & Filter Bar */}
-          <div className="glass-card" style={{ padding: "1rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <div style={{ position: "relative", width: "320px", display: "flex", alignItems: "center" }}>
-              <Search size={16} style={{ position: "absolute", left: "0.75rem", color: "var(--text-muted)" }} />
-              <input
-                type="text"
-                placeholder="Cari Nama Santri / Kode Unik..."
-                style={{
-                  width: "100%",
-                  paddingLeft: "2.25rem",
-                  paddingRight: "0.85rem",
-                  paddingTop: "0.5rem",
-                  paddingBottom: "0.5rem",
-                  border: "1px solid var(--border-glass)",
-                  borderRadius: "6px",
-                  backgroundColor: "var(--bg-app)",
-                  color: "var(--text-main)",
-                  fontSize: "0.85rem",
-                  outline: "none",
-                }}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
+          {/* Table Container */}
+          <div className="glass-card" style={{ padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "1rem" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.5rem 0.85rem", border: "1px solid var(--border-glass)", borderRadius: "6px", backgroundColor: "var(--bg-app)" }}>
+                <Search size={16} style={{ color: "var(--text-muted)" }} />
+                <input
+                  type="text"
+                  placeholder="Cari santri..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  style={{ border: "none", outline: "none", backgroundColor: "transparent", fontSize: "0.85rem", color: "var(--text-main)", width: "220px" }}
+                />
+              </div>
             </div>
 
-            <div style={{ fontSize: "0.85rem", fontWeight: 700, color: "var(--text-muted)" }}>
-              Total Santri: <span style={{ color: "var(--primary)", fontWeight: 800 }}>{santriList.length} Santri</span>
-            </div>
-          </div>
-
-          {/* Santri Table */}
-          <div style={{ backgroundColor: "#ffffff", border: "1px solid var(--border-glass)", borderRadius: "8px", overflow: "hidden", boxShadow: "0 4px 12px rgba(0, 0, 0, 0.05)" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "0.88rem" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.85rem", textAlign: "left" }}>
               <thead>
-                <tr style={{ backgroundColor: "#f7f3eb", borderBottom: "1px solid var(--border-glass)" }}>
-                  <th style={{ padding: "0.85rem 1rem", fontSize: "0.75rem", fontWeight: 800, color: "#516071", textTransform: "uppercase" }}>Kode Unik Santri</th>
-                  <th style={{ padding: "0.85rem 1rem", fontSize: "0.75rem", fontWeight: 800, color: "#516071", textTransform: "uppercase" }}>Nama Santri</th>
-                  <th style={{ padding: "0.85rem 1rem", fontSize: "0.75rem", fontWeight: 800, color: "#516071", textTransform: "uppercase" }}>Kelas</th>
-                  <th style={{ padding: "0.85rem 1rem", fontSize: "0.75rem", fontWeight: 800, color: "#516071", textTransform: "uppercase" }}>Wali Murid (No. HP)</th>
-                  <th style={{ padding: "0.85rem 1rem", fontSize: "0.75rem", fontWeight: 800, color: "#516071", textTransform: "uppercase" }}>Potongan SPP</th>
-                  <th style={{ padding: "0.85rem 1rem", fontSize: "0.75rem", fontWeight: 800, color: "#516071", textTransform: "uppercase", textAlign: "center" }}>Aksi</th>
+                <tr style={{ borderBottom: "1px solid var(--border-glass)", color: "var(--text-muted)", textTransform: "uppercase", fontSize: "0.72rem", letterSpacing: "0.05em" }}>
+                  <th style={{ padding: "0.75rem 1rem" }}>Kode / Nama Santri</th>
+                  <th style={{ padding: "0.75rem 1rem" }}>Kelas</th>
+                  <th style={{ padding: "0.75rem 1rem" }}>Wali Murid & Kontak</th>
+                  <th style={{ padding: "0.75rem 1rem" }}>Saldo Saku / Limit</th>
+                  <th style={{ padding: "0.75rem 1rem" }}>Beasiswa SPP</th>
+                  <th style={{ padding: "0.75rem 1rem", textAlign: "center" }}>Aksi Master & Saku</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredSantri.length > 0 ? (
+                {loading ? (
+                  <tr>
+                    <td colSpan={6} style={{ padding: "3rem", textAlign: "center" }}>
+                      <Loader2 className="animate-spin" size={32} style={{ color: "var(--primary)", margin: "0 auto" }} />
+                    </td>
+                  </tr>
+                ) : filteredSantri.length > 0 ? (
                   filteredSantri.map((s) => (
                     <tr key={s.id} style={{ borderBottom: "1px solid var(--border-glass)" }}>
-                      <td style={{ padding: "0.9rem 1rem", fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, color: "var(--primary)" }}>{s.nisn}</td>
-                      <td style={{ padding: "0.9rem 1rem", fontWeight: 700, color: "var(--text-main)" }}>{s.name}</td>
-                      <td style={{ padding: "0.9rem 1rem", color: "var(--text-muted)" }}>{s.kelas?.name || "-"}</td>
+                      <td style={{ padding: "0.9rem 1rem" }}>
+                        <div style={{ fontWeight: 800, color: "var(--text-main)" }}>{s.name}</div>
+                        <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace" }}>{s.nisn}</div>
+                      </td>
+                      <td style={{ padding: "0.9rem 1rem" }}>
+                        <span style={{ fontWeight: 700, backgroundColor: "var(--primary-light)", color: "var(--primary)", padding: "0.2rem 0.5rem", borderRadius: "4px", fontSize: "0.75rem" }}>
+                          Kelas {s.kelas?.name}
+                        </span>
+                      </td>
                       <td style={{ padding: "0.9rem 1rem", color: "var(--text-main)" }}>
                         <div style={{ fontWeight: 600 }}>{s.wali?.user?.name || "-"}</div>
-                        <div style={{ fontSize: "0.75rem", color: "var(--text-dim)" }}>{s.wali?.user?.phone || "-"}</div>
+                        <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>{s.wali?.user?.phone || "-"}</div>
+                      </td>
+                      <td style={{ padding: "0.9rem 1rem" }}>
+                        <div style={{ fontWeight: 800, color: "var(--primary)" }}>{formatIDR(Number(s.saldoSaku || 0))}</div>
+                        <div style={{ fontSize: "0.74rem", color: "var(--text-muted)" }}>
+                          Limit: {formatIDR(Number(s.limitHarian || 20000))}/hr
+                        </div>
                       </td>
                       <td style={{ padding: "0.9rem 1rem", fontWeight: 700, color: "var(--status-lunas)" }}>
                         {s.potonganTetap > 0 ? formatIDR(s.potonganTetap) : "-"}
                       </td>
                       <td style={{ padding: "0.9rem 1rem", textAlign: "center" }}>
-                        <div style={{ display: "flex", gap: "0.4rem", justifyContent: "center" }}>
+                        <div style={{ display: "flex", gap: "0.35rem", justifyContent: "center" }}>
                           <button
-                            onClick={() => handleOpenEdit(s)}
+                            title="Top-up Saku Tunai"
+                            onClick={() => handleOpenTopup(s)}
                             style={{
-                              padding: "0.35rem 0.65rem",
+                              padding: "0.35rem 0.55rem",
                               fontSize: "0.75rem",
                               fontWeight: 700,
                               backgroundColor: "var(--primary-light)",
@@ -269,7 +338,41 @@ export default function AdminSantriPage() {
                               cursor: "pointer",
                               display: "flex",
                               alignItems: "center",
-                              gap: "0.25rem",
+                              gap: "0.2rem",
+                            }}
+                          >
+                            <Coins size={12} /> Topup TU
+                          </button>
+                          <button
+                            title="Atur Limit Jajan"
+                            onClick={() => handleOpenLimit(s)}
+                            style={{
+                              padding: "0.35rem 0.55rem",
+                              fontSize: "0.75rem",
+                              fontWeight: 700,
+                              backgroundColor: "var(--bg-surface-low)",
+                              color: "var(--text-main)",
+                              border: "1px solid var(--border-glass)",
+                              borderRadius: "4px",
+                              cursor: "pointer",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "0.2rem",
+                            }}
+                          >
+                            <Sliders size={12} /> Limit
+                          </button>
+                          <button
+                            onClick={() => handleOpenEdit(s)}
+                            style={{
+                              padding: "0.35rem 0.55rem",
+                              fontSize: "0.75rem",
+                              fontWeight: 700,
+                              backgroundColor: "var(--bg-app)",
+                              color: "var(--text-main)",
+                              border: "1px solid var(--border-glass)",
+                              borderRadius: "4px",
+                              cursor: "pointer",
                             }}
                           >
                             <Edit size={12} /> Edit
@@ -277,11 +380,11 @@ export default function AdminSantriPage() {
                           <button
                             onClick={() => handleDeleteSantri(s.id)}
                             style={{
-                              padding: "0.35rem 0.6rem",
+                              padding: "0.35rem 0.55rem",
                               fontSize: "0.75rem",
-                              backgroundColor: "var(--status-ditolak-bg)",
+                              backgroundColor: "rgba(220, 38, 38, 0.1)",
                               color: "var(--status-ditolak)",
-                              border: "1px solid var(--status-ditolak)",
+                              border: "1px solid rgba(220, 38, 38, 0.2)",
                               borderRadius: "4px",
                               cursor: "pointer",
                             }}
@@ -295,7 +398,7 @@ export default function AdminSantriPage() {
                 ) : (
                   <tr>
                     <td colSpan={6} style={{ padding: "3rem", textAlign: "center", color: "var(--text-muted)", fontSize: "0.9rem" }}>
-                      Belum ada data santri. Klik <strong>"Tambah Santri Baru"</strong> di atas untuk menambahkan santri dari nol.
+                      Belum ada data santri ditemukan.
                     </td>
                   </tr>
                 )}
@@ -304,6 +407,106 @@ export default function AdminSantriPage() {
           </div>
         </div>
       </main>
+
+      {/* MODAL TOPUP TUNAI TU */}
+      {topupModalSantri && (
+        <div style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 999, padding: "1rem" }}>
+          <GlassCard style={{ width: "100%", maxWidth: "440px", padding: "1.75rem", display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--border-glass)", paddingBottom: "0.75rem" }}>
+              <div>
+                <h3 style={{ fontSize: "1.1rem", fontWeight: 800, color: "var(--text-main)" }}>
+                  Top-up Saku Santri Tunai (TU)
+                </h3>
+                <p style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>
+                  {topupModalSantri.name} (Kelas {topupModalSantri.kelas?.name})
+                </p>
+              </div>
+              <button onClick={() => setTopupModalSantri(null)} style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer" }}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmitTopup} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+              <div>
+                <label style={{ fontSize: "0.75rem", fontWeight: 800, textTransform: "uppercase", color: "var(--text-muted)" }}>Nominal Top-up Tunai (Rp)</label>
+                <input
+                  type="number"
+                  required
+                  placeholder="Contoh: 100000"
+                  value={topupNominal}
+                  onChange={(e) => setTopupNominal(e.target.value)}
+                  style={{ width: "100%", padding: "0.65rem 0.85rem", border: "1px solid var(--border-glass)", borderRadius: "6px", backgroundColor: "var(--bg-app)", fontSize: "0.95rem", fontWeight: 800, marginTop: "0.2rem" }}
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: "0.75rem", fontWeight: 800, textTransform: "uppercase", color: "var(--text-muted)" }}>Catatan / Keterangan</label>
+                <input
+                  type="text"
+                  value={topupCatatan}
+                  onChange={(e) => setTopupCatatan(e.target.value)}
+                  style={{ width: "100%", padding: "0.65rem 0.85rem", border: "1px solid var(--border-glass)", borderRadius: "6px", backgroundColor: "var(--bg-app)", fontSize: "0.85rem", marginTop: "0.2rem" }}
+                />
+              </div>
+
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem", marginTop: "0.5rem" }}>
+                <button type="button" onClick={() => setTopupModalSantri(null)} style={{ padding: "0.6rem 1.25rem", border: "1px solid var(--border-glass)", borderRadius: "6px", backgroundColor: "transparent", color: "var(--text-main)", fontWeight: 700, cursor: "pointer" }}>
+                  Batal
+                </button>
+                <button type="submit" disabled={submittingTopup} style={{ padding: "0.6rem 1.25rem", backgroundColor: "var(--primary)", color: "#fff", border: "none", borderRadius: "6px", fontWeight: 700, cursor: submittingTopup ? "not-allowed" : "pointer", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                  {submittingTopup ? <Loader2 className="animate-spin" size={16} /> : <Coins size={16} />}
+                  Proses Top-up
+                </button>
+              </div>
+            </form>
+          </GlassCard>
+        </div>
+      )}
+
+      {/* MODAL EDIT LIMIT JAJAN HARIAN */}
+      {limitModalSantri && (
+        <div style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 999, padding: "1rem" }}>
+          <GlassCard style={{ width: "100%", maxWidth: "440px", padding: "1.75rem", display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--border-glass)", paddingBottom: "0.75rem" }}>
+              <div>
+                <h3 style={{ fontSize: "1.1rem", fontWeight: 800, color: "var(--text-main)" }}>
+                  Atur Limit Jajan Harian
+                </h3>
+                <p style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>
+                  {limitModalSantri.name} (Kelas {limitModalSantri.kelas?.name})
+                </p>
+              </div>
+              <button onClick={() => setLimitModalSantri(null)} style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer" }}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmitLimit} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+              <div>
+                <label style={{ fontSize: "0.75rem", fontWeight: 800, textTransform: "uppercase", color: "var(--text-muted)" }}>Nominal Limit Jajan Harian (Rp)</label>
+                <input
+                  type="number"
+                  required
+                  placeholder="Contoh: 20000"
+                  value={limitNominal}
+                  onChange={(e) => setLimitNominal(e.target.value)}
+                  style={{ width: "100%", padding: "0.65rem 0.85rem", border: "1px solid var(--border-glass)", borderRadius: "6px", backgroundColor: "var(--bg-app)", fontSize: "0.95rem", fontWeight: 800, marginTop: "0.2rem" }}
+                />
+              </div>
+
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem", marginTop: "0.5rem" }}>
+                <button type="button" onClick={() => setLimitModalSantri(null)} style={{ padding: "0.6rem 1.25rem", border: "1px solid var(--border-glass)", borderRadius: "6px", backgroundColor: "transparent", color: "var(--text-main)", fontWeight: 700, cursor: "pointer" }}>
+                  Batal
+                </button>
+                <button type="submit" disabled={submittingLimit} style={{ padding: "0.6rem 1.25rem", backgroundColor: "var(--primary)", color: "#fff", border: "none", borderRadius: "6px", fontWeight: 700, cursor: submittingLimit ? "not-allowed" : "pointer", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                  {submittingLimit ? <Loader2 className="animate-spin" size={16} /> : <Sliders size={16} />}
+                  Simpan Limit
+                </button>
+              </div>
+            </form>
+          </GlassCard>
+        </div>
+      )}
 
       {/* Modal Tambah / Edit Santri */}
       {isAddModalOpen && (

@@ -423,3 +423,134 @@ export async function getTopupListForVerification() {
 
   return topups;
 }
+
+// ========== ADMIN FULL CONTROL: TOPUP TUNAI DI MEJA TU ==========
+
+export async function adminTopUpCash(data: {
+  siswaId: string;
+  nominal: number;
+  catatan?: string;
+}) {
+  const session = await getServerSession(authOptions);
+  if (!session || session.user.role !== "ADMIN") {
+    throw new Error("Akses ditolak. Hanya Admin yang dapat memproses topup tunai.");
+  }
+
+  if (data.nominal <= 0) {
+    throw new Error("Nominal topup tunai harus lebih dari 0.");
+  }
+
+  return await prisma.$transaction(async (tx) => {
+    const siswa = await tx.siswa.findUnique({
+      where: { id: data.siswaId },
+      include: {
+        wali: {
+          include: { user: { select: { id: true, name: true, phone: true } } },
+        },
+        kelas: { select: { name: true } },
+      },
+    });
+
+    if (!siswa) {
+      throw new Error("Data santri tidak ditemukan.");
+    }
+
+    const prevSaldo = Number(siswa.saldoSaku);
+    const newSaldo = prevSaldo + data.nominal;
+
+    // Update Saldo Santri
+    await tx.siswa.update({
+      where: { id: data.siswaId },
+      data: { saldoSaku: newSaldo },
+    });
+
+    // Buat Topup Record
+    const topup = await (tx as any).topupSaku.create({
+      data: {
+        siswaId: data.siswaId,
+        nominal: data.nominal,
+        buktiUrl: "/uploads/topup_cash_tu.png",
+        status: "BERHASIL",
+        catatan: data.catatan || "Top-up Tunai di Kasir Meja TU.",
+      },
+    });
+
+    // Catat AuditLog
+    await (tx as any).auditLog.create({
+      data: {
+        userId: session.user.id,
+        action: "TOPUP_CASH_TU",
+        entityType: "TopupSaku",
+        entityId: topup.id,
+        details: JSON.stringify({
+          siswaId: data.siswaId,
+          nominal: data.nominal,
+          newSaldo,
+        }),
+      },
+    });
+
+    const nominalFormat = formatIDR(data.nominal);
+    const waliUserId = siswa.wali.user.id;
+    const waliPhone = siswa.wali.user.phone;
+
+    // In-app Notification
+    createNotification(
+      waliUserId,
+      "💵 Top-up Tunai Berhasil",
+      `Top-up Saku Santri tunai di TU untuk ${siswa.name} (${nominalFormat}) telah berhasil. Saldo baru: ${formatIDR(newSaldo)}.`
+    ).catch(() => {});
+
+    // WA Notification
+    if (waliPhone) {
+      sendWhatsAppMessage({
+        targetPhone: waliPhone,
+        message: `💵 TOP-UP SAKU SANTRI TUNAI (TU)\n\nSantri: ${siswa.name} (${siswa.kelas.name})\nNominal Top-up: ${nominalFormat}\nSaldo Saku Terbaru: ${formatIDR(newSaldo)}\n\nTerima kasih. 🙏`,
+      }).catch((err) => console.error("Gagal kirim WA:", err));
+    }
+
+    revalidatePath("/admin/santri");
+    revalidatePath("/wali/dashboard");
+
+    return {
+      success: true,
+      message: `Top-up tunai ${nominalFormat} untuk ${siswa.name} berhasil dicatat. Saldo baru: ${formatIDR(newSaldo)}.`,
+      newSaldo,
+    };
+  });
+}
+
+// ========== ADMIN FULL CONTROL: UBAH LIMIT JAJAN HARIAN ==========
+
+export async function adminUpdateLimitHarian(siswaId: string, limitHarian: number) {
+  const session = await getServerSession(authOptions);
+  if (!session || session.user.role !== "ADMIN") {
+    throw new Error("Akses ditolak. Hanya Admin yang dapat mengubah limit harian.");
+  }
+
+  if (limitHarian < 0) {
+    throw new Error("Limit harian tidak boleh kurang dari 0.");
+  }
+
+  const updatedSiswa = await prisma.siswa.update({
+    where: { id: siswaId },
+    data: { limitHarian },
+  });
+
+  // AuditLog
+  await (prisma as any).auditLog.create({
+    data: {
+      userId: session.user.id,
+      action: "UPDATE_LIMIT_HARIAN",
+      entityType: "Siswa",
+      entityId: siswaId,
+      details: JSON.stringify({ limitHarian }),
+    },
+  });
+
+  revalidatePath("/admin/santri");
+  revalidatePath("/koperasi/dashboard");
+  revalidatePath("/wali/dashboard");
+
+  return updatedSiswa;
+}

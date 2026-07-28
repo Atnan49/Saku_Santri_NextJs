@@ -210,3 +210,21 @@ export async function deleteUser(userId: string) {
   revalidatePath("/admin/pengaturan");
   return { success: true };
 }
+
+// ========== AUDIT LOG LIST QUERY ==========
+
+export async function getAuditLogList(limit = 50) {
+  await requireAdmin();
+
+  const logs = await (prisma as any).auditLog.findMany({
+    take: limit,
+    orderBy: { createdAt: "desc" },
+    include: {
+      user: {
+        select: { name: true, role: true, username: true },
+      },
+    },
+  });
+
+  return logs;
+}

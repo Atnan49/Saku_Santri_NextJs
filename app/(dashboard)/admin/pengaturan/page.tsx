@@ -2,8 +2,9 @@
 
 // =========================================================================
 // TANGGUNG JAWAB: Usva (Frontend) & Atnan (Backend/Logic)
-// Deskripsi: Halaman pengaturan sistem untuk mengelola Konfigurasi SPP Bulanan
-//            Otomatis, Master Jenis Tagihan, Tahun Ajaran, dan Rekening Bank.
+// Deskripsi: Halaman pengaturan sistem super-admin untuk mengelola SPP,
+//            Tahun Ajaran, Master Tagihan (Edit & Delete), Rekening Bank,
+//            Akun Wali, Staf & User, serta Audit Log.
 // =========================================================================
 
 import React, { useState, useEffect } from "react";
@@ -14,7 +15,14 @@ import SegmentedControl from "@/components/ui/SegmentedControl";
 import { formatIDR } from "@/lib/utils";
 import { getTahunAjaranList, createTahunAjaran, setActiveTahunAjaran } from "@/lib/actions/tahun-ajaran";
 import { getJenisTagihanList, createJenisTagihan, updateJenisTagihan, deleteJenisTagihan } from "@/lib/actions/jenis-tagihan";
-import { getWaliMuridList, updateUserPassword } from "@/lib/actions/user";
+import {
+  getWaliMuridList,
+  updateUserPassword,
+  getUserList,
+  createStaffUser,
+  getAuditLogList,
+  deleteUser,
+} from "@/lib/actions/user";
 import { getInstitutionSettings, updateInstitutionSettings } from "@/lib/actions/settings";
 import {
   Settings,
@@ -33,6 +41,9 @@ import {
   Pencil,
   Trash2,
   X,
+  UserPlus,
+  Shield,
+  Activity,
 } from "lucide-react";
 
 export default function AdminPengaturanPage() {
@@ -41,7 +52,6 @@ export default function AdminPengaturanPage() {
 
   // Form State SPP Auto Generate
   const [nominalSPP, setNominalSPP] = useState("250000");
-  const [dueDateDay, setDueDateDay] = useState("10");
   const [sppSavedAlert, setSppSavedAlert] = useState(false);
 
   // Form State Tahun Ajaran
@@ -78,35 +88,56 @@ export default function AdminPengaturanPage() {
   // State Wali Murid
   const [waliList, setWaliList] = useState<any[]>([]);
 
+  // Reset Password State
+  const [resetModalOpen, setResetModalOpen] = useState(false);
+  const [selectedUserForReset, setSelectedUserForReset] = useState<{ id: string; name: string } | null>(null);
+  const [newPasswordInput, setNewPasswordInput] = useState("santri123");
+  const [isResettingPassword, setIsResettingPassword] = useState(false);
+
+  // State Staf User & Audit Log
+  const [userList, setUserList] = useState<any[]>([]);
+  const [auditLogs, setAuditLogs] = useState<any[]>([]);
+
+  const [staffName, setStaffName] = useState("");
+  const [staffUsername, setStaffUsername] = useState("");
+  const [staffEmail, setStaffEmail] = useState("");
+  const [staffPassword, setStaffPassword] = useState("");
+  const [staffRole, setStaffRole] = useState<"ADMIN" | "BENDAHARA">("BENDAHARA");
+  const [savingStaff, setSavingStaff] = useState(false);
+
   const loadData = async () => {
     setLoading(true);
     try {
-      const [tData, jData, wData, settings] = await Promise.all([
+      const [tData, jData, wData, settings, uData, aLogs] = await Promise.all([
         getTahunAjaranList(),
         getJenisTagihanList(),
         getWaliMuridList(),
         getInstitutionSettings(),
+        getUserList(),
+        getAuditLogList(50).catch(() => []),
       ]);
       setTahunList(tData);
       setJenisList(jData);
       setWaliList(wData);
+      setUserList(uData);
+      setAuditLogs(aLogs);
 
-      // Cari nominal SPP dari master jika ada
       const sppMaster = jData.find((j: any) => j.type === "BULANAN");
       if (sppMaster) {
         setNominalSPP(String(sppMaster.nominal));
       }
 
-      // Load settings
-      setInstName(settings.INSTITUTION_NAME);
-      setBank1Name(settings.BANK_NAME_1);
-      setBank1Acc(settings.BANK_ACC_1);
-      setBank1Holder(settings.BANK_HOLDER_1);
-      setBank2Name(settings.BANK_NAME_2);
-      setBank2Acc(settings.BANK_ACC_2);
-      setBank2Holder(settings.BANK_HOLDER_2);
+      if (settings) {
+        if (settings.INSTITUTION_NAME) setInstName(settings.INSTITUTION_NAME);
+        if (settings.BANK_NAME_1) setBank1Name(settings.BANK_NAME_1);
+        if (settings.BANK_ACC_1) setBank1Acc(settings.BANK_ACC_1);
+        if (settings.BANK_HOLDER_1) setBank1Holder(settings.BANK_HOLDER_1);
+        if (settings.BANK_NAME_2) setBank2Name(settings.BANK_NAME_2);
+        if (settings.BANK_ACC_2) setBank2Acc(settings.BANK_ACC_2);
+        if (settings.BANK_HOLDER_2) setBank2Holder(settings.BANK_HOLDER_2);
+      }
     } catch (err) {
-      console.error("Gagal memuat pengaturan:", err);
+      console.error("Gagal memuat data pengaturan:", err);
     } finally {
       setLoading(false);
     }
@@ -116,10 +147,41 @@ export default function AdminPengaturanPage() {
     loadData();
   }, []);
 
-  const [resetModalOpen, setResetModalOpen] = useState(false);
-  const [selectedUserForReset, setSelectedUserForReset] = useState<{ id: string; name: string } | null>(null);
-  const [newPasswordInput, setNewPasswordInput] = useState("santri123");
-  const [isResettingPassword, setIsResettingPassword] = useState(false);
+  const handleCreateStaff = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!staffName || !staffUsername || !staffPassword) return;
+    setSavingStaff(true);
+    try {
+      await createStaffUser({
+        name: staffName.trim(),
+        username: staffUsername.trim(),
+        email: staffEmail.trim() || undefined,
+        password: staffPassword,
+        role: staffRole,
+      });
+      alert(`Akun staf baru (${staffRole}) berhasil dibuat!`);
+      setStaffName("");
+      setStaffUsername("");
+      setStaffEmail("");
+      setStaffPassword("");
+      await loadData();
+    } catch (err: any) {
+      alert(err.message || "Gagal membuat akun staf.");
+    } finally {
+      setSavingStaff(false);
+    }
+  };
+
+  const handleDeleteStaffUser = async (userId: string, name: string) => {
+    if (!confirm(`Apakah Anda yakin ingin menghapus akun user "${name}"?`)) return;
+    try {
+      await deleteUser(userId);
+      alert(`Akun "${name}" berhasil dihapus.`);
+      await loadData();
+    } catch (err: any) {
+      alert(err.message || "Gagal menghapus user.");
+    }
+  };
 
   const handleOpenResetModal = (userId: string, name: string) => {
     setSelectedUserForReset({ id: userId, name });
@@ -182,15 +244,16 @@ export default function AdminPengaturanPage() {
         BANK_HOLDER_2: bank2Holder.trim(),
       });
       setBankSavedAlert(true);
+      await loadData();
       setTimeout(() => setBankSavedAlert(false), 2000);
     } catch (err: any) {
-      alert(err.message || "Gagal menyimpan data rekening.");
+      alert(err.message || "Gagal menyimpan pengaturan bank.");
     } finally {
       setSavingBank(false);
     }
   };
 
-  const handleAddTahun = async (e: React.FormEvent) => {
+  const handleCreateTahun = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!tahunAjaran) return;
     setSavingTahun(true);
@@ -199,13 +262,13 @@ export default function AdminPengaturanPage() {
       setTahunAjaran("");
       await loadData();
     } catch (err: any) {
-      alert(err.message || "Gagal menambah tahun ajaran.");
+      alert(err.message || "Gagal membuat tahun ajaran.");
     } finally {
       setSavingTahun(false);
     }
   };
 
-  const handleSetActiveTahun = async (id: string) => {
+  const handleActivateTahun = async (id: string) => {
     try {
       await setActiveTahunAjaran(id);
       await loadData();
@@ -214,7 +277,7 @@ export default function AdminPengaturanPage() {
     }
   };
 
-  const handleAddJenis = async (e: React.FormEvent) => {
+  const handleCreateJenis = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!jenisNama || !jenisNominal) return;
     setSavingJenis(true);
@@ -228,7 +291,7 @@ export default function AdminPengaturanPage() {
       setJenisNominal("");
       await loadData();
     } catch (err: any) {
-      alert(err.message || "Gagal menambah jenis tagihan.");
+      alert(err.message || "Gagal membuat jenis tagihan.");
     } finally {
       setSavingJenis(false);
     }
@@ -273,6 +336,8 @@ export default function AdminPengaturanPage() {
     }
   };
 
+  const staffUsers = userList.filter((u) => u.role !== "WALIMURID");
+
   return (
     <div className="app-container">
       <SidebarNav activeItem="PENGATURAN" userRole="ADMINISTRATOR" userName="Admin Tata Usaha" />
@@ -284,7 +349,7 @@ export default function AdminPengaturanPage() {
           
           <div>
             <div style={{ fontSize: "0.72rem", fontWeight: 800, letterSpacing: "0.1em", color: "var(--text-muted)", textTransform: "uppercase" }}>
-              KONFIGURASI PUSAT
+              KONFIGURASI PUSAT ADMINISTRATOR SUPER
             </div>
             <h1 style={{ fontSize: "1.75rem", fontWeight: 800, color: "var(--text-main)", marginTop: "0.2rem" }}>
               Pengaturan Sistem & Parameter Keuangan
@@ -292,15 +357,15 @@ export default function AdminPengaturanPage() {
           </div>
 
           {/* Segmented Control Tabs */}
-          <div style={{ maxWidth: "750px" }}>
+          <div style={{ width: "100%", overflowX: "auto" }}>
             <SegmentedControl
-              options={["Konfigurasi SPP", "Tahun Ajaran", "Master Tagihan", "Rekening Bank", "Akun Wali"]}
+              options={["Konfigurasi SPP", "Tahun Ajaran", "Master Tagihan", "Rekening Bank", "Akun Wali", "Staf & User", "Audit Log"]}
               selectedValue={activeTab}
               onChange={(val) => setActiveTab(val)}
             />
           </div>
 
-          {/* TAB 1: KONFIGURASI SPP BULANAN OTOMATIS */}
+          {/* TAB 1: KONFIGURASI SPP */}
           {activeTab === "Konfigurasi SPP" && (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(420px, 1fr))", gap: "1.5rem" }}>
               <GlassCard style={{ display: "flex", flexDirection: "column", gap: "1.25rem", padding: "1.5rem" }}>
@@ -310,10 +375,10 @@ export default function AdminPengaturanPage() {
                   </div>
                   <div>
                     <h3 style={{ fontSize: "1.1rem", fontWeight: 800, color: "var(--text-main)" }}>
-                      Parameter Generator SPP Otomatis
+                      Parameter SPP Standar
                     </h3>
                     <p style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>
-                      Atur acuan dasar nominal SPP dan jatuh tempo untuk penerbitan bulanan.
+                      Nominal acuan SPP bulanan yang digunakan saat auto-generate tagihan.
                     </p>
                   </div>
                 </div>
@@ -321,40 +386,20 @@ export default function AdminPengaturanPage() {
                 {sppSavedAlert && (
                   <div style={{ backgroundColor: "var(--status-lunas-bg)", border: "1px solid var(--status-lunas)", borderRadius: "6px", padding: "0.75rem 1rem", color: "var(--status-lunas)", fontSize: "0.85rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
                     <CheckCircle2 size={18} />
-                    <span>Konfigurasi SPP Bulanan berhasil diperbarui!</span>
+                    <span>Pengaturan SPP berhasil diperbarui!</span>
                   </div>
                 )}
 
                 <form onSubmit={handleSaveSPP} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
                   <div>
-                    <label style={{ fontSize: "0.75rem", fontWeight: 800, textTransform: "uppercase", color: "var(--text-muted)" }}>Nominal Standar SPP Bulanan (Rp)</label>
+                    <label style={{ fontSize: "0.75rem", fontWeight: 800, textTransform: "uppercase", color: "var(--text-muted)" }}>Nominal SPP Standar per Bulan (Rp)</label>
                     <input
                       type="number"
                       required
-                      placeholder="250000"
                       value={nominalSPP}
                       onChange={(e) => setNominalSPP(e.target.value)}
                       style={{ width: "100%", padding: "0.65rem 0.85rem", border: "1px solid var(--border-glass)", borderRadius: "6px", backgroundColor: "var(--bg-app)", fontSize: "0.9rem", marginTop: "0.2rem" }}
                     />
-                  </div>
-
-                  <div>
-                    <label style={{ fontSize: "0.75rem", fontWeight: 800, textTransform: "uppercase", color: "var(--text-muted)" }}>Batas Tanggal Jatuh Tempo Setiap Bulan</label>
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                      <span style={{ fontSize: "0.88rem", fontWeight: 700 }}>Tanggal</span>
-                      <select
-                        value={dueDateDay}
-                        onChange={(e) => setDueDateDay(e.target.value)}
-                        style={{ padding: "0.65rem 0.85rem", border: "1px solid var(--border-glass)", borderRadius: "6px", backgroundColor: "var(--bg-app)", fontSize: "0.9rem" }}
-                      >
-                        <option value="5">5</option>
-                        <option value="10">10 (Rekomendasi)</option>
-                        <option value="15">15</option>
-                        <option value="20">20</option>
-                        <option value="25">25</option>
-                      </select>
-                      <span style={{ fontSize: "0.88rem", fontWeight: 700 }}>setiap bulannya</span>
-                    </div>
                   </div>
 
                   <div style={{ backgroundColor: "var(--bg-surface-low)", border: "1px solid var(--border-glass)", borderRadius: "6px", padding: "0.85rem", fontSize: "0.8rem", color: "var(--text-muted)" }}>
@@ -376,7 +421,7 @@ export default function AdminPengaturanPage() {
                 <h3 style={{ fontSize: "1.1rem", fontWeight: 800, color: "var(--text-main)", borderBottom: "1px solid var(--border-glass)", paddingBottom: "0.5rem" }}>
                   Tambah Tahun Ajaran
                 </h3>
-                <form onSubmit={handleAddTahun} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                <form onSubmit={handleCreateTahun} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
                   <div>
                     <label style={{ fontSize: "0.75rem", fontWeight: 800, textTransform: "uppercase", color: "var(--text-muted)" }}>Format Tahun Ajaran</label>
                     <input
@@ -388,8 +433,8 @@ export default function AdminPengaturanPage() {
                       style={{ width: "100%", padding: "0.6rem", border: "1px solid var(--border-glass)", borderRadius: "4px", marginTop: "0.2rem" }}
                     />
                   </div>
-                  <button type="submit" style={{ padding: "0.65rem", backgroundColor: "var(--primary)", color: "#fff", border: "none", borderRadius: "4px", fontWeight: 700, cursor: "pointer" }}>
-                    Simpan Tahun Ajaran
+                  <button type="submit" disabled={savingTahun} style={{ padding: "0.65rem", backgroundColor: "var(--primary)", color: "#fff", border: "none", borderRadius: "4px", fontWeight: 700, cursor: "pointer" }}>
+                    {savingTahun ? "Menyimpan..." : "Simpan Tahun Ajaran"}
                   </button>
                 </form>
               </GlassCard>
@@ -400,16 +445,14 @@ export default function AdminPengaturanPage() {
                 </h3>
                 <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
                   {tahunList.map((t) => (
-                    <div key={t.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.75rem 1rem", border: "1px solid var(--border-glass)", borderRadius: "6px", backgroundColor: "var(--bg-app)" }}>
-                      <span style={{ fontWeight: 800, color: "var(--text-main)" }}>{t.year}</span>
-                      {t.isActive ? (
-                        <span style={{ fontSize: "0.75rem", fontWeight: 800, color: "var(--status-lunas)", backgroundColor: "var(--status-lunas-bg)", padding: "0.25rem 0.6rem", borderRadius: "999px" }}>AKTIF</span>
-                      ) : (
-                        <button
-                          onClick={() => handleSetActiveTahun(t.id)}
-                          style={{ fontSize: "0.75rem", fontWeight: 700, padding: "0.25rem 0.6rem", border: "1px solid var(--border-glass)", borderRadius: "4px", background: "none", cursor: "pointer" }}
-                        >
-                          Aktifkan
+                    <div key={t.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.75rem", border: "1px solid var(--border-glass)", borderRadius: "6px", backgroundColor: t.isActive ? "var(--primary-light)" : "transparent" }}>
+                      <div>
+                        <span style={{ fontWeight: 800, color: "var(--text-main)" }}>{t.year}</span>
+                        {t.isActive && <span style={{ marginLeft: "0.5rem", fontSize: "0.75rem", fontWeight: 700, color: "var(--primary)" }}>(AKTIF)</span>}
+                      </div>
+                      {!t.isActive && (
+                        <button onClick={() => handleActivateTahun(t.id)} style={{ padding: "0.3rem 0.6rem", fontSize: "0.75rem", fontWeight: 700, backgroundColor: "var(--primary)", color: "#fff", border: "none", borderRadius: "4px", cursor: "pointer" }}>
+                          Set Aktif
                         </button>
                       )}
                     </div>
@@ -424,50 +467,48 @@ export default function AdminPengaturanPage() {
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(400px, 1fr))", gap: "1.5rem" }}>
               <GlassCard style={{ display: "flex", flexDirection: "column", gap: "1rem", padding: "1.5rem" }}>
                 <h3 style={{ fontSize: "1.1rem", fontWeight: 800, color: "var(--text-main)", borderBottom: "1px solid var(--border-glass)", paddingBottom: "0.5rem" }}>
-                  Tambah Jenis Tagihan Baru
+                  Tambah Master Jenis Tagihan
                 </h3>
-                <form onSubmit={handleAddJenis} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                <form onSubmit={handleCreateJenis} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
                   <div>
                     <label style={{ fontSize: "0.75rem", fontWeight: 800, textTransform: "uppercase", color: "var(--text-muted)" }}>Nama Jenis Tagihan</label>
                     <input
                       type="text"
                       required
-                      placeholder="Contoh: Uang Gedung / Buku Modul"
+                      placeholder="Contoh: Uang Gedung / Seragam"
                       value={jenisNama}
                       onChange={(e) => setJenisNama(e.target.value)}
                       style={{ width: "100%", padding: "0.6rem", border: "1px solid var(--border-glass)", borderRadius: "4px", marginTop: "0.2rem" }}
                     />
                   </div>
 
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
-                    <div>
-                      <label style={{ fontSize: "0.75rem", fontWeight: 800, textTransform: "uppercase", color: "var(--text-muted)" }}>Nominal Standar (Rp)</label>
-                      <input
-                        type="number"
-                        required
-                        placeholder="250000"
-                        value={jenisNominal}
-                        onChange={(e) => setJenisNominal(e.target.value)}
-                        style={{ width: "100%", padding: "0.6rem", border: "1px solid var(--border-glass)", borderRadius: "4px", marginTop: "0.2rem" }}
-                      />
-                    </div>
-
-                    <div>
-                      <label style={{ fontSize: "0.75rem", fontWeight: 800, textTransform: "uppercase", color: "var(--text-muted)" }}>Tipe Tagihan</label>
-                      <select
-                        value={jenisType}
-                        onChange={(e) => setJenisType(e.target.value as "BULANAN" | "TAHUNAN" | "BEBAS")}
-                        style={{ width: "100%", padding: "0.6rem", border: "1px solid var(--border-glass)", borderRadius: "4px", marginTop: "0.2rem" }}
-                      >
-                        <option value="BULANAN">Bulanan</option>
-                        <option value="TAHUNAN">Tahunan</option>
-                        <option value="BEBAS">Bebas/Kegiatan</option>
-                      </select>
-                    </div>
+                  <div>
+                    <label style={{ fontSize: "0.75rem", fontWeight: 800, textTransform: "uppercase", color: "var(--text-muted)" }}>Nominal Standar (Rp)</label>
+                    <input
+                      type="number"
+                      required
+                      placeholder="Contoh: 500000"
+                      value={jenisNominal}
+                      onChange={(e) => setJenisNominal(e.target.value)}
+                      style={{ width: "100%", padding: "0.6rem", border: "1px solid var(--border-glass)", borderRadius: "4px", marginTop: "0.2rem" }}
+                    />
                   </div>
 
-                  <button type="submit" style={{ padding: "0.65rem", backgroundColor: "var(--primary)", color: "#fff", border: "none", borderRadius: "4px", fontWeight: 700, cursor: "pointer" }}>
-                    Simpan Jenis Tagihan
+                  <div>
+                    <label style={{ fontSize: "0.75rem", fontWeight: 800, textTransform: "uppercase", color: "var(--text-muted)" }}>Tipe Tagihan</label>
+                    <select
+                      value={jenisType}
+                      onChange={(e) => setJenisType(e.target.value as any)}
+                      style={{ width: "100%", padding: "0.6rem", border: "1px solid var(--border-glass)", borderRadius: "4px", marginTop: "0.2rem" }}
+                    >
+                      <option value="BULANAN">Bulanan (Rutinan)</option>
+                      <option value="TAHUNAN">Tahunan / Sekali</option>
+                      <option value="BEBAS">Bebas (Insidental)</option>
+                    </select>
+                  </div>
+
+                  <button type="submit" disabled={savingJenis} style={{ padding: "0.65rem", backgroundColor: "var(--primary)", color: "#fff", border: "none", borderRadius: "4px", fontWeight: 700, cursor: "pointer" }}>
+                    {savingJenis ? "Memproses..." : "Simpan Jenis Tagihan"}
                   </button>
                 </form>
               </GlassCard>
@@ -478,62 +519,27 @@ export default function AdminPengaturanPage() {
                 </h3>
                 <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
                   {jenisList.map((j) => (
-                    <div key={j.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.75rem 1rem", border: "1px solid var(--border-glass)", borderRadius: "6px", backgroundColor: "var(--bg-app)" }}>
+                    <div key={j.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.75rem", border: "1px solid var(--border-glass)", borderRadius: "6px" }}>
                       <div>
                         <div style={{ fontWeight: 800, color: "var(--text-main)" }}>{j.name}</div>
-                        <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>Tipe: {j.type}</div>
+                        <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
+                          {formatIDR(Number(j.nominal))} ({j.type})
+                        </div>
                       </div>
-                      <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-                        <div style={{ fontWeight: 800, color: "var(--primary)" }}>
-                          Rp {Number(j.nominal).toLocaleString("id-ID")}
-                        </div>
-                        <div style={{ display: "flex", gap: "0.35rem" }}>
-                          <button
-                            title="Edit Jenis Tagihan"
-                            onClick={() => handleStartEditJenis(j)}
-                            style={{
-                              padding: "0.35rem 0.6rem",
-                              backgroundColor: "var(--bg-surface-low)",
-                              color: "var(--primary)",
-                              border: "1px solid var(--border-glass)",
-                              borderRadius: "4px",
-                              cursor: "pointer",
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "0.25rem",
-                              fontSize: "0.75rem",
-                              fontWeight: 700,
-                            }}
-                          >
-                            <Pencil size={14} /> Edit
-                          </button>
-                          <button
-                            title="Hapus Jenis Tagihan"
-                            disabled={deletingJenisId === j.id}
-                            onClick={() => handleDeleteJenis(j.id, j.name)}
-                            style={{
-                              padding: "0.35rem 0.6rem",
-                              backgroundColor: "rgba(220, 38, 38, 0.1)",
-                              color: "var(--status-ditolak)",
-                              border: "1px solid rgba(220, 38, 38, 0.2)",
-                              borderRadius: "4px",
-                              cursor: deletingJenisId === j.id ? "not-allowed" : "pointer",
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "0.25rem",
-                              fontSize: "0.75rem",
-                              fontWeight: 700,
-                            }}
-                          >
-                            {deletingJenisId === j.id ? (
-                              <Loader2 className="animate-spin" size={14} />
-                            ) : (
-                              <>
-                                <Trash2 size={14} /> Hapus
-                              </>
-                            )}
-                          </button>
-                        </div>
+                      <div style={{ display: "flex", gap: "0.35rem" }}>
+                        <button
+                          onClick={() => handleStartEditJenis(j)}
+                          style={{ padding: "0.35rem 0.55rem", fontSize: "0.75rem", fontWeight: 700, backgroundColor: "var(--primary-light)", color: "var(--primary)", border: "1px solid var(--primary)", borderRadius: "4px", cursor: "pointer" }}
+                        >
+                          <Pencil size={12} /> Edit
+                        </button>
+                        <button
+                          disabled={deletingJenisId === j.id}
+                          onClick={() => handleDeleteJenis(j.id, j.name)}
+                          style={{ padding: "0.35rem 0.55rem", fontSize: "0.75rem", fontWeight: 700, backgroundColor: "rgba(220, 38, 38, 0.1)", color: "var(--status-ditolak)", border: "1px solid rgba(220, 38, 38, 0.2)", borderRadius: "4px", cursor: "pointer" }}
+                        >
+                          <Trash2 size={12} /> Hapus
+                        </button>
                       </div>
                     </div>
                   ))}
@@ -542,106 +548,20 @@ export default function AdminPengaturanPage() {
             </div>
           )}
 
-          {/* MODAL EDIT JENIS TAGIHAN */}
-          {editingJenis && (
-            <div style={{
-              position: "fixed",
-              inset: 0,
-              backgroundColor: "rgba(0, 0, 0, 0.5)",
-              backdropFilter: "blur(4px)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              zIndex: 999,
-              padding: "1rem"
-            }}>
-              <GlassCard style={{ width: "100%", maxWidth: "480px", padding: "1.75rem", display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--border-glass)", paddingBottom: "0.75rem" }}>
-                  <h3 style={{ fontSize: "1.1rem", fontWeight: 800, color: "var(--text-main)" }}>
-                    Edit Jenis Tagihan
-                  </h3>
-                  <button
-                    onClick={() => setEditingJenis(null)}
-                    style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer" }}
-                  >
-                    <X size={20} />
-                  </button>
-                </div>
-
-                <form onSubmit={handleUpdateJenis} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-                  <div>
-                    <label style={{ fontSize: "0.75rem", fontWeight: 800, textTransform: "uppercase", color: "var(--text-muted)" }}>Nama Jenis Tagihan</label>
-                    <input
-                      type="text"
-                      required
-                      value={editJenisNama}
-                      onChange={(e) => setEditJenisNama(e.target.value)}
-                      style={{ width: "100%", padding: "0.65rem 0.85rem", border: "1px solid var(--border-glass)", borderRadius: "6px", backgroundColor: "var(--bg-app)", fontSize: "0.9rem", marginTop: "0.2rem" }}
-                    />
-                  </div>
-
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
-                    <div>
-                      <label style={{ fontSize: "0.75rem", fontWeight: 800, textTransform: "uppercase", color: "var(--text-muted)" }}>Nominal Standar (Rp)</label>
-                      <input
-                        type="number"
-                        required
-                        value={editJenisNominal}
-                        onChange={(e) => setEditJenisNominal(e.target.value)}
-                        style={{ width: "100%", padding: "0.65rem 0.85rem", border: "1px solid var(--border-glass)", borderRadius: "6px", backgroundColor: "var(--bg-app)", fontSize: "0.9rem", marginTop: "0.2rem" }}
-                      />
-                    </div>
-
-                    <div>
-                      <label style={{ fontSize: "0.75rem", fontWeight: 800, textTransform: "uppercase", color: "var(--text-muted)" }}>Tipe Tagihan</label>
-                      <select
-                        value={editJenisType}
-                        onChange={(e) => setEditJenisType(e.target.value as "BULANAN" | "TAHUNAN" | "BEBAS")}
-                        style={{ width: "100%", padding: "0.65rem 0.85rem", border: "1px solid var(--border-glass)", borderRadius: "6px", backgroundColor: "var(--bg-app)", fontSize: "0.9rem", marginTop: "0.2rem" }}
-                      >
-                        <option value="BULANAN">Bulanan</option>
-                        <option value="TAHUNAN">Tahunan</option>
-                        <option value="BEBAS">Bebas/Kegiatan</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem", marginTop: "0.5rem" }}>
-                    <button
-                      type="button"
-                      onClick={() => setEditingJenis(null)}
-                      style={{ padding: "0.6rem 1.25rem", border: "1px solid var(--border-glass)", borderRadius: "6px", backgroundColor: "transparent", color: "var(--text-main)", fontWeight: 700, cursor: "pointer" }}
-                    >
-                      Batal
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={updatingJenis}
-                      style={{ padding: "0.6rem 1.25rem", backgroundColor: "var(--primary)", color: "#fff", border: "none", borderRadius: "6px", fontWeight: 700, cursor: updatingJenis ? "not-allowed" : "pointer", display: "flex", alignItems: "center", gap: "0.5rem" }}
-                    >
-                      {updatingJenis ? <Loader2 className="animate-spin" size={16} /> : <Save size={16} />}
-                      Simpan Perubahan
-                    </button>
-                  </div>
-                </form>
-              </GlassCard>
-            </div>
-          )}
-
           {/* TAB 4: REKENING BANK */}
           {activeTab === "Rekening Bank" && (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(420px, 1fr))", gap: "1.5rem" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(450px, 1fr))", gap: "1.5rem" }}>
               <GlassCard style={{ display: "flex", flexDirection: "column", gap: "1.25rem", padding: "1.5rem" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", borderBottom: "1px solid var(--border-glass)", paddingBottom: "0.75rem" }}>
                   <div style={{ padding: "0.5rem", borderRadius: "8px", backgroundColor: "var(--primary-light)", color: "var(--primary)" }}>
-                    <CreditCard size={22} />
+                    <Building2 size={22} />
                   </div>
                   <div>
                     <h3 style={{ fontSize: "1.1rem", fontWeight: 800, color: "var(--text-main)" }}>
-                      Pengaturan Rekening Bank & Informasi Pesantren
+                      Informasi Rekening Pembayaran
                     </h3>
                     <p style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>
-                      Informasi ini ditampilkan secara dinamis ke Wali Murid saat melakukan transfer setoran.
+                      Nomor rekening yang tampil pada portal Wali Murid & invoice kwitansi.
                     </p>
                   </div>
                 </div>
@@ -649,24 +569,22 @@ export default function AdminPengaturanPage() {
                 {bankSavedAlert && (
                   <div style={{ backgroundColor: "var(--status-lunas-bg)", border: "1px solid var(--status-lunas)", borderRadius: "6px", padding: "0.75rem 1rem", color: "var(--status-lunas)", fontSize: "0.85rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
                     <CheckCircle2 size={18} />
-                    <span>Data rekening bank & institusi berhasil diperbarui!</span>
+                    <span>Informasi Rekening & Institusi berhasil diperbarui!</span>
                   </div>
                 )}
 
-                <form onSubmit={handleSaveBank} style={{ display: "flex", flexDirection: "column", gap: "1.2rem" }}>
+                <form onSubmit={handleSaveBank} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
                   <div>
                     <label style={{ fontSize: "0.75rem", fontWeight: 800, textTransform: "uppercase", color: "var(--text-muted)" }}>Nama Institusi / Pesantren</label>
                     <input
                       type="text"
                       required
-                      placeholder="Pesantren Digital Saku Santri"
                       value={instName}
                       onChange={(e) => setInstName(e.target.value)}
-                      style={{ width: "100%", padding: "0.65rem 0.85rem", border: "1px solid var(--border-glass)", borderRadius: "6px", backgroundColor: "var(--bg-app)", fontSize: "0.9rem", marginTop: "0.2rem" }}
+                      style={{ width: "100%", padding: "0.6rem 0.85rem", border: "1px solid var(--border-glass)", borderRadius: "6px", backgroundColor: "var(--bg-app)", fontSize: "0.88rem", marginTop: "0.2rem" }}
                     />
                   </div>
 
-                  {/* Rekening Utama (Bank 1) */}
                   <div style={{ border: "1px dashed var(--border-glass)", padding: "1rem", borderRadius: "8px", display: "flex", flexDirection: "column", gap: "0.8rem" }}>
                     <span style={{ fontSize: "0.8rem", fontWeight: 800, color: "var(--primary)" }}>REKENING UTAMA (BANK 1)</span>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
@@ -675,7 +593,6 @@ export default function AdminPengaturanPage() {
                         <input
                           type="text"
                           required
-                          placeholder="BANK SYARIAH INDONESIA (BSI)"
                           value={bank1Name}
                           onChange={(e) => setBank1Name(e.target.value)}
                           style={{ width: "100%", padding: "0.55rem 0.75rem", border: "1px solid var(--border-glass)", borderRadius: "6px", backgroundColor: "var(--bg-app)", fontSize: "0.85rem" }}
@@ -686,7 +603,6 @@ export default function AdminPengaturanPage() {
                         <input
                           type="text"
                           required
-                          placeholder="7182 9910 22"
                           value={bank1Acc}
                           onChange={(e) => setBank1Acc(e.target.value)}
                           style={{ width: "100%", padding: "0.55rem 0.75rem", border: "1px solid var(--border-glass)", borderRadius: "6px", backgroundColor: "var(--bg-app)", fontSize: "0.85rem" }}
@@ -694,53 +610,12 @@ export default function AdminPengaturanPage() {
                       </div>
                     </div>
                     <div>
-                      <label style={{ fontSize: "0.72rem", fontWeight: 700, color: "var(--text-muted)" }}>Atas Nama (Pemilik Rekening)</label>
+                      <label style={{ fontSize: "0.72rem", fontWeight: 700, color: "var(--text-muted)" }}>Atas Nama</label>
                       <input
                         type="text"
                         required
-                        placeholder="a.n. Yayasan Pendidikan Digital"
                         value={bank1Holder}
                         onChange={(e) => setBank1Holder(e.target.value)}
-                        style={{ width: "100%", padding: "0.55rem 0.75rem", border: "1px solid var(--border-glass)", borderRadius: "6px", backgroundColor: "var(--bg-app)", fontSize: "0.85rem" }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Rekening Sekunder (Bank 2) */}
-                  <div style={{ border: "1px dashed var(--border-glass)", padding: "1rem", borderRadius: "8px", display: "flex", flexDirection: "column", gap: "0.8rem" }}>
-                    <span style={{ fontSize: "0.8rem", fontWeight: 800, color: "var(--primary)" }}>REKENING ALTERNATIF (BANK 2)</span>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
-                      <div>
-                        <label style={{ fontSize: "0.72rem", fontWeight: 700, color: "var(--text-muted)" }}>Nama Bank</label>
-                        <input
-                          type="text"
-                          required
-                          placeholder="BANK MANDIRI"
-                          value={bank2Name}
-                          onChange={(e) => setBank2Name(e.target.value)}
-                          style={{ width: "100%", padding: "0.55rem 0.75rem", border: "1px solid var(--border-glass)", borderRadius: "6px", backgroundColor: "var(--bg-app)", fontSize: "0.85rem" }}
-                        />
-                      </div>
-                      <div>
-                        <label style={{ fontSize: "0.72rem", fontWeight: 700, color: "var(--text-muted)" }}>No. Rekening</label>
-                        <input
-                          type="text"
-                          required
-                          placeholder="131 00 2938 1192"
-                          value={bank2Acc}
-                          onChange={(e) => setBank2Acc(e.target.value)}
-                          style={{ width: "100%", padding: "0.55rem 0.75rem", border: "1px solid var(--border-glass)", borderRadius: "6px", backgroundColor: "var(--bg-app)", fontSize: "0.85rem" }}
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <label style={{ fontSize: "0.72rem", fontWeight: 700, color: "var(--text-muted)" }}>Atas Nama (Pemilik Rekening)</label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="a.n. Yayasan Pendidikan Digital"
-                        value={bank2Holder}
-                        onChange={(e) => setBank2Holder(e.target.value)}
                         style={{ width: "100%", padding: "0.55rem 0.75rem", border: "1px solid var(--border-glass)", borderRadius: "6px", backgroundColor: "var(--bg-app)", fontSize: "0.85rem" }}
                       />
                     </div>
@@ -749,19 +624,7 @@ export default function AdminPengaturanPage() {
                   <button
                     type="submit"
                     disabled={savingBank}
-                    style={{
-                      padding: "0.75rem",
-                      backgroundColor: "var(--primary)",
-                      color: "#fff",
-                      border: "none",
-                      borderRadius: "6px",
-                      fontWeight: 800,
-                      cursor: savingBank ? "not-allowed" : "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: "0.5rem",
-                    }}
+                    style={{ padding: "0.75rem", backgroundColor: "var(--primary)", color: "#fff", border: "none", borderRadius: "6px", fontWeight: 800, cursor: savingBank ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem" }}
                   >
                     {savingBank ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
                     <span>{savingBank ? "Menyimpan..." : "SIMPAN PENGATURAN REKENING"}</span>
@@ -800,7 +663,7 @@ export default function AdminPengaturanPage() {
                   </thead>
                   <tbody>
                     {waliList.length > 0 ? (
-                      waliList.map((w) => (
+                      waliList.map((w: any) => (
                         <tr key={w.id} style={{ borderBottom: "1px solid var(--border-glass)" }}>
                           <td style={{ padding: "0.9rem 1rem", fontWeight: 700, color: "var(--text-main)" }}>{w.user?.name || "-"}</td>
                           <td style={{ padding: "0.9rem 1rem", fontFamily: "'JetBrains Mono', monospace", color: "var(--primary)", fontWeight: 700 }}>
@@ -843,27 +706,224 @@ export default function AdminPengaturanPage() {
               </div>
             </GlassCard>
           )}
+
+          {/* TAB 6: STAF & USER MANAGEMENT (FULL CONTROL) */}
+          {activeTab === "Staf & User" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+              <GlassCard style={{ padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", borderBottom: "1px solid var(--border-glass)", paddingBottom: "0.75rem" }}>
+                  <div style={{ padding: "0.5rem", borderRadius: "8px", backgroundColor: "var(--primary-light)", color: "var(--primary)" }}>
+                    <Shield size={22} />
+                  </div>
+                  <div>
+                    <h3 style={{ fontSize: "1.1rem", fontWeight: 800, color: "var(--text-main)" }}>
+                      Buat Akun Staf / Pengelola Baru
+                    </h3>
+                    <p style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>
+                      Tambah staf baru untuk Admin TU atau Bendahara Keuangan.
+                    </p>
+                  </div>
+                </div>
+
+                <form onSubmit={handleCreateStaff} style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "1rem" }}>
+                  <div>
+                    <label style={{ fontSize: "0.72rem", fontWeight: 800, textTransform: "uppercase", color: "var(--text-muted)" }}>Nama Lengkap Staf</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Contoh: Ust. Ahmad Fauzi"
+                      value={staffName}
+                      onChange={(e) => setStaffName(e.target.value)}
+                      style={{ width: "100%", padding: "0.6rem 0.85rem", border: "1px solid var(--border-glass)", borderRadius: "6px", backgroundColor: "var(--bg-app)", fontSize: "0.85rem", marginTop: "0.2rem" }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: "0.72rem", fontWeight: 800, textTransform: "uppercase", color: "var(--text-muted)" }}>Username Login</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Contoh: bendahara2"
+                      value={staffUsername}
+                      onChange={(e) => setStaffUsername(e.target.value)}
+                      style={{ width: "100%", padding: "0.6rem 0.85rem", border: "1px solid var(--border-glass)", borderRadius: "6px", backgroundColor: "var(--bg-app)", fontSize: "0.85rem", marginTop: "0.2rem" }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: "0.72rem", fontWeight: 800, textTransform: "uppercase", color: "var(--text-muted)" }}>Peran Akses (Role)</label>
+                    <select
+                      value={staffRole}
+                      onChange={(e) => setStaffRole(e.target.value as any)}
+                      style={{ width: "100%", padding: "0.6rem 0.85rem", border: "1px solid var(--border-glass)", borderRadius: "6px", backgroundColor: "var(--bg-app)", fontSize: "0.85rem", marginTop: "0.2rem" }}
+                    >
+                      <option value="BENDAHARA">BENDAHARA KEUANGAN</option>
+                      <option value="ADMIN">ADMINISTRATOR TU</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: "0.72rem", fontWeight: 800, textTransform: "uppercase", color: "var(--text-muted)" }}>Password Akses</label>
+                    <input
+                      type="password"
+                      required
+                      placeholder="Minimal 6 karakter"
+                      value={staffPassword}
+                      onChange={(e) => setStaffPassword(e.target.value)}
+                      style={{ width: "100%", padding: "0.6rem 0.85rem", border: "1px solid var(--border-glass)", borderRadius: "6px", backgroundColor: "var(--bg-app)", fontSize: "0.85rem", marginTop: "0.2rem" }}
+                    />
+                  </div>
+
+                  <div style={{ gridColumn: "1 / -1", display: "flex", justifyContent: "flex-end" }}>
+                    <button
+                      type="submit"
+                      disabled={savingStaff}
+                      style={{ padding: "0.7rem 1.5rem", backgroundColor: "var(--primary)", color: "#fff", border: "none", borderRadius: "6px", fontWeight: 800, cursor: savingStaff ? "not-allowed" : "pointer", display: "flex", alignItems: "center", gap: "0.5rem" }}
+                    >
+                      {savingStaff ? <Loader2 className="animate-spin" size={16} /> : <UserPlus size={16} />}
+                      Buat Akun Staf
+                    </button>
+                  </div>
+                </form>
+              </GlassCard>
+
+              {/* Table User Staf */}
+              <GlassCard style={{ padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1rem" }}>
+                <h3 style={{ fontSize: "1.05rem", fontWeight: 800, color: "var(--text-main)" }}>
+                  Daftar User Pengelola System (Admin & Staf)
+                </h3>
+
+                <div style={{ backgroundColor: "#ffffff", border: "1px solid var(--border-glass)", borderRadius: "8px", overflow: "hidden" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "0.88rem" }}>
+                    <thead>
+                      <tr style={{ backgroundColor: "#f7f3eb", borderBottom: "1px solid var(--border-glass)" }}>
+                        <th style={{ padding: "0.85rem 1rem", fontSize: "0.75rem", fontWeight: 800, color: "#516071" }}>Nama Staf</th>
+                        <th style={{ padding: "0.85rem 1rem", fontSize: "0.75rem", fontWeight: 800, color: "#516071" }}>Username</th>
+                        <th style={{ padding: "0.85rem 1rem", fontSize: "0.75rem", fontWeight: 800, color: "#516071" }}>Role</th>
+                        <th style={{ padding: "0.85rem 1rem", fontSize: "0.75rem", fontWeight: 800, color: "#516071", textAlign: "center" }}>Aksi Control</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {staffUsers.map((u: any) => (
+                        <tr key={u.id} style={{ borderBottom: "1px solid var(--border-glass)" }}>
+                          <td style={{ padding: "0.85rem 1rem", fontWeight: 800, color: "var(--text-main)" }}>{u.name}</td>
+                          <td style={{ padding: "0.85rem 1rem", fontFamily: "'JetBrains Mono', monospace", color: "var(--primary)", fontWeight: 700 }}>{u.username}</td>
+                          <td style={{ padding: "0.85rem 1rem" }}>
+                            <span style={{ padding: "0.2rem 0.5rem", borderRadius: "4px", fontSize: "0.72rem", fontWeight: 800, backgroundColor: "var(--primary-light)", color: "var(--primary)" }}>
+                              {u.role}
+                            </span>
+                          </td>
+                          <td style={{ padding: "0.85rem 1rem", textAlign: "center" }}>
+                            <div style={{ display: "flex", gap: "0.5rem", justifyContent: "center" }}>
+                              <button
+                                onClick={() => handleOpenResetModal(u.id, u.name)}
+                                style={{ padding: "0.35rem 0.6rem", fontSize: "0.75rem", fontWeight: 700, backgroundColor: "var(--status-menunggu-bg)", color: "var(--status-menunggu)", border: "1px solid var(--status-menunggu)", borderRadius: "4px", cursor: "pointer" }}
+                              >
+                                Reset Pass
+                              </button>
+                              <button
+                                onClick={() => handleDeleteStaffUser(u.id, u.name)}
+                                style={{ padding: "0.35rem 0.6rem", fontSize: "0.75rem", fontWeight: 700, backgroundColor: "rgba(220, 38, 38, 0.1)", color: "var(--status-ditolak)", border: "1px solid rgba(220, 38, 38, 0.2)", borderRadius: "4px", cursor: "pointer" }}
+                              >
+                                Hapus
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </GlassCard>
+            </div>
+          )}
+
+          {/* TAB 7: AUDIT LOG VIEWER (FULL CONTROL) */}
+          {activeTab === "Audit Log" && (
+            <GlassCard style={{ padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", borderBottom: "1px solid var(--border-glass)", paddingBottom: "0.75rem" }}>
+                <div style={{ padding: "0.5rem", borderRadius: "8px", backgroundColor: "var(--primary-light)", color: "var(--primary)" }}>
+                  <Activity size={22} />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: "1.1rem", fontWeight: 800, color: "var(--text-main)" }}>
+                    Jejak Audit Aktivitas System (AuditLog)
+                  </h3>
+                  <p style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>
+                    Rekam jejak real-time seluruh tindakan sensitif (pembayaran tunai, edit tagihan, void, topup, dll).
+                  </p>
+                </div>
+              </div>
+
+              <div style={{ backgroundColor: "#ffffff", border: "1px solid var(--border-glass)", borderRadius: "8px", overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "0.82rem" }}>
+                  <thead>
+                    <tr style={{ backgroundColor: "#f7f3eb", borderBottom: "1px solid var(--border-glass)" }}>
+                      <th style={{ padding: "0.85rem 1rem", fontSize: "0.72rem", fontWeight: 800, color: "#516071" }}>WAKTU</th>
+                      <th style={{ padding: "0.85rem 1rem", fontSize: "0.72rem", fontWeight: 800, color: "#516071" }}>USER / EKSEKUTOR</th>
+                      <th style={{ padding: "0.85rem 1rem", fontSize: "0.72rem", fontWeight: 800, color: "#516071" }}>TINDAKAN (ACTION)</th>
+                      <th style={{ padding: "0.85rem 1rem", fontSize: "0.72rem", fontWeight: 800, color: "#516071" }}>ENTITAS</th>
+                      <th style={{ padding: "0.85rem 1rem", fontSize: "0.72rem", fontWeight: 800, color: "#516071" }}>RINCIAN LOG</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {auditLogs.length > 0 ? (
+                      auditLogs.map((log: any) => (
+                        <tr key={log.id} style={{ borderBottom: "1px solid var(--border-glass)" }}>
+                          <td style={{ padding: "0.85rem 1rem", color: "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace", fontSize: "0.76rem" }}>
+                            {new Date(log.createdAt).toLocaleString("id-ID")}
+                          </td>
+                          <td style={{ padding: "0.85rem 1rem" }}>
+                            <div style={{ fontWeight: 800, color: "var(--text-main)" }}>{log.user?.name || "System"}</div>
+                            <div style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>{log.user?.role}</div>
+                          </td>
+                          <td style={{ padding: "0.85rem 1rem" }}>
+                            <span style={{ padding: "0.2rem 0.5rem", borderRadius: "4px", fontSize: "0.7rem", fontWeight: 800, backgroundColor: "var(--primary-light)", color: "var(--primary)", fontFamily: "'JetBrains Mono', monospace" }}>
+                              {log.action}
+                            </span>
+                          </td>
+                          <td style={{ padding: "0.85rem 1rem", fontWeight: 700 }}>
+                            {log.entityType} ({log.entityId?.slice(-6)})
+                          </td>
+                          <td style={{ padding: "0.85rem 1rem", fontFamily: "'JetBrains Mono', monospace", fontSize: "0.74rem", color: "var(--text-muted)", maxWidth: "350px", wordBreak: "break-all" }}>
+                            {log.details || "-"}
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={5} style={{ padding: "3rem", textAlign: "center", color: "var(--text-muted)" }}>
+                          Belum ada jejak audit tercatat.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </GlassCard>
+          )}
         </div>
       </main>
 
+      {/* Modal Reset Password */}
       {resetModalOpen && selectedUserForReset && (
-        <div className="modal-overlay" onClick={() => setResetModalOpen(false)}>
-          <div className="glass-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: "440px", width: "100%", padding: "1.5rem" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
+        <div style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 999, padding: "1rem" }}>
+          <GlassCard style={{ maxWidth: "440px", width: "100%", padding: "1.75rem", display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--border-glass)", paddingBottom: "0.75rem" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                 <KeyRound size={20} style={{ color: "var(--status-menunggu)" }} />
                 <h3 style={{ fontSize: "1.1rem", fontWeight: 800, color: "var(--text-main)" }}>
-                  Reset Password Wali Murid
+                  Reset Password User
                 </h3>
               </div>
               <button onClick={() => setResetModalOpen(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-main)" }}>
-                ✕
+                <X size={20} />
               </button>
             </div>
 
             <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
               <p style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>
-                Masukkan password baru untuk wali murid <strong>{selectedUserForReset.name}</strong>:
+                Masukkan password baru untuk user <strong>{selectedUserForReset.name}</strong>:
               </p>
 
               <div>
@@ -876,8 +936,8 @@ export default function AdminPengaturanPage() {
                     width: "100%",
                     padding: "0.65rem 0.85rem",
                     border: "1px solid var(--border-glass)",
-                    borderRadius: "8px",
-                    backgroundColor: "rgba(255, 255, 255, 0.05)",
+                    borderRadius: "6px",
+                    backgroundColor: "var(--bg-app)",
                     color: "var(--text-main)",
                     fontSize: "0.95rem",
                     fontWeight: 700,
@@ -898,7 +958,7 @@ export default function AdminPengaturanPage() {
                     backgroundColor: "transparent",
                     color: "var(--text-main)",
                     border: "1px solid var(--border-glass)",
-                    borderRadius: "8px",
+                    borderRadius: "6px",
                     cursor: "pointer",
                   }}
                   onClick={() => setResetModalOpen(false)}
@@ -914,7 +974,7 @@ export default function AdminPengaturanPage() {
                     backgroundColor: "var(--status-menunggu)",
                     color: "#FFF",
                     border: "none",
-                    borderRadius: "8px",
+                    borderRadius: "6px",
                     cursor: isResettingPassword ? "not-allowed" : "pointer",
                   }}
                   onClick={handleConfirmResetPassword}
@@ -923,12 +983,9 @@ export default function AdminPengaturanPage() {
                 </button>
               </div>
             </div>
-          </div>
+          </GlassCard>
         </div>
       )}
     </div>
   );
 }
-
-
-
