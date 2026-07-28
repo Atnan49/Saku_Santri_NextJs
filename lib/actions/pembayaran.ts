@@ -24,6 +24,7 @@ import { formatIDR } from "@/lib/utils";
 export async function submitPaymentProof(data: {
   tagihanId: string;
   buktiUrl: string;
+  nominalDisetor?: number;
   catatanWali?: string;
 }) {
   const session = await getServerSession(authOptions);
@@ -31,8 +32,12 @@ export async function submitPaymentProof(data: {
     throw new Error("Akses ditolak. Hanya Wali Murid yang dapat mengunggah bukti bayar.");
   }
 
-  // Ambil data tagihan beserta relasi siswa, wali, dan pembayaran
-  const tagihan = await prisma.tagihan.findUnique({
+  if (!data.buktiUrl || data.buktiUrl.trim().length === 0) {
+    throw new Error("Bukti pembayaran (gambar/PDF) wajib diunggah.");
+  }
+
+  // Ambil data tagihan beserta relasi siswa dan wali
+  const tagihan = await (prisma as any).tagihan.findUnique({
     where: { id: data.tagihanId },
     include: {
       siswa: {
@@ -41,7 +46,6 @@ export async function submitPaymentProof(data: {
         },
       },
       jenisTagihan: { select: { name: true } },
-      pembayaran: true,
     },
   });
 
@@ -54,32 +58,36 @@ export async function submitPaymentProof(data: {
     throw new Error("Anda tidak memiliki akses ke tagihan ini.");
   }
 
-  // Validasi status tagihan (hanya BELUM_BAYAR atau DITOLAK yang boleh di-resubmit)
-  const allowedStatuses = ["BELUM_BAYAR", "DITOLAK_ADMIN", "DITOLAK_BENDAHARA"];
+  const sisaWajibBayar = Math.max(0, Number(tagihan.nominalAkhir) - Number(tagihan.nominalTerbayar || 0));
+  if (sisaWajibBayar <= 0 || tagihan.status === "LUNAS") {
+    throw new Error("Tagihan ini sudah LUNAS.");
+  }
+
+  const setoran = data.nominalDisetor && data.nominalDisetor > 0 ? data.nominalDisetor : sisaWajibBayar;
+  if (setoran > sisaWajibBayar) {
+    throw new Error(`Nominal setoran (Rp ${setoran.toLocaleString("id-ID")}) melebihi sisa sisa tagihan (Rp ${sisaWajibBayar.toLocaleString("id-ID")}).`);
+  }
+
+  // Validasi status tagihan
+  const allowedStatuses = ["BELUM_BAYAR", "DIBAYAR_SEBAGIAN", "DITOLAK_ADMIN", "DITOLAK_BENDAHARA"];
   if (!allowedStatuses.includes(tagihan.status)) {
     throw new Error(
-      `Tagihan ini tidak dapat dibayar (status saat ini: ${tagihan.status}).`
+      `Tagihan ini sedang dalam proses verifikasi/approval (${tagihan.status}).`
     );
   }
 
-  // Hapus pembayaran lama jika ada (re-submission setelah ditolak)
-  if (tagihan.pembayaran) {
-    await prisma.pembayaran.delete({
-      where: { tagihanId: data.tagihanId },
-    });
-  }
-
   // Buat record pembayaran baru
-  await prisma.pembayaran.create({
+  await (prisma as any).pembayaran.create({
     data: {
       tagihanId: data.tagihanId,
+      nominalDisetor: setoran,
       buktiUrl: data.buktiUrl,
       catatanWali: data.catatanWali || null,
     },
   });
 
   // Update status tagihan
-  await prisma.tagihan.update({
+  await (prisma as any).tagihan.update({
     where: { id: data.tagihanId },
     data: { status: "MENUNGGU_VERIFIKASI_ADMIN" },
   });
@@ -88,7 +96,7 @@ export async function submitPaymentProof(data: {
   await notifyByRole(
     "ADMIN",
     "Bukti Pembayaran Baru",
-    `${tagihan.siswa.name} telah mengunggah bukti pembayaran untuk ${tagihan.jenisTagihan.name}. Silakan verifikasi.`
+    `${tagihan.siswa.name} telah mengunggah bukti pembayaran ${formatIDR(setoran)} untuk ${tagihan.jenisTagihan.name}. Silakan verifikasi.`
   );
 
   revalidatePath("/wali/dashboard");
@@ -110,7 +118,7 @@ export async function adminVerifyPayment(data: {
     throw new Error("Akses ditolak. Hanya Admin yang dapat memverifikasi pembayaran.");
   }
 
-  const pembayaran = await prisma.pembayaran.findUnique({
+  const pembayaran = await (prisma as any).pembayaran.findUnique({
     where: { id: data.pembayaranId },
     include: {
       tagihan: {
@@ -145,25 +153,42 @@ export async function adminVerifyPayment(data: {
   const jenisName = pembayaran.tagihan.jenisTagihan.name;
 
   if (data.action === "approve") {
+    // Pastikan ada bukti transfer
+    if (!pembayaran.buktiUrl) {
+      throw new Error("Tidak dapat menyetujui pembayaran tanpa bukti transfer.");
+    }
+
     // Approve → lanjut ke Tahap 2 (Bendahara)
-    await prisma.pembayaran.update({
+    await (prisma as any).pembayaran.update({
       where: { id: data.pembayaranId },
       data: {
         verifiedAt: new Date(),
+        verifiedByUserId: session.user.id,
         catatanAdmin: data.catatan || "Diverifikasi oleh Admin TU.",
       },
     });
 
-    await prisma.tagihan.update({
+    await (prisma as any).tagihan.update({
       where: { id: pembayaran.tagihanId },
       data: { status: "MENUNGGU_APPROVAL_BENDAHARA" },
+    });
+
+    // Catat AuditLog
+    await (prisma as any).auditLog.create({
+      data: {
+        userId: session.user.id,
+        action: "VERIFY_PAYMENT_ADMIN",
+        entityType: "Pembayaran",
+        entityId: pembayaran.id,
+        details: JSON.stringify({ tagihanId: pembayaran.tagihanId, setoran: Number(pembayaran.nominalDisetor) }),
+      },
     });
 
     // Notifikasi ke Bendahara
     await notifyByRole(
       "BENDAHARA",
       "Menunggu Approval Final",
-      `Pembayaran ${jenisName} dari ${siswa.name} (${siswa.kelas.name}) telah diverifikasi Admin. Menunggu persetujuan Anda.`
+      `Pembayaran ${jenisName} (${formatIDR(Number(pembayaran.nominalDisetor))}) dari ${siswa.name} (${siswa.kelas.name}) telah diverifikasi Admin. Menunggu persetujuan Anda.`
     );
 
     // Notifikasi ke Wali
@@ -186,16 +211,27 @@ export async function adminVerifyPayment(data: {
       throw new Error("Alasan penolakan wajib diisi.");
     }
 
-    await prisma.pembayaran.update({
+    await (prisma as any).pembayaran.update({
       where: { id: data.pembayaranId },
       data: {
         catatanAdmin: data.catatan,
       },
     });
 
-    await prisma.tagihan.update({
+    await (prisma as any).tagihan.update({
       where: { id: pembayaran.tagihanId },
       data: { status: "DITOLAK_ADMIN" },
+    });
+
+    // Catat AuditLog
+    await (prisma as any).auditLog.create({
+      data: {
+        userId: session.user.id,
+        action: "REJECT_PAYMENT_ADMIN",
+        entityType: "Pembayaran",
+        entityId: pembayaran.id,
+        details: JSON.stringify({ reason: data.catatan }),
+      },
     });
 
     // Notifikasi ke Wali
@@ -240,7 +276,7 @@ export async function bendaharaApprovePayment(data: {
     throw new Error("Akses ditolak. Hanya Bendahara yang dapat menyetujui pembayaran.");
   }
 
-  const pembayaran = await prisma.pembayaran.findUnique({
+  const pembayaran = await (prisma as any).pembayaran.findUnique({
     where: { id: data.pembayaranId },
     include: {
       tagihan: {
@@ -269,64 +305,114 @@ export async function bendaharaApprovePayment(data: {
     throw new Error("Pembayaran ini tidak dalam status menunggu approval bendahara.");
   }
 
-  const siswa = pembayaran.tagihan.siswa;
+  const tagihan = pembayaran.tagihan;
+  const siswa = tagihan.siswa;
   const waliPhone = siswa.wali.user.phone;
   const waliUserId = siswa.wali.user.id;
-  const jenisName = pembayaran.tagihan.jenisTagihan.name;
-  const nominal = formatIDR(pembayaran.tagihan.nominalAkhir.toString());
+  const jenisName = tagihan.jenisTagihan.name;
 
   if (data.action === "approve") {
-    // Approve final → LUNAS
-    await prisma.pembayaran.update({
+    const disetor = Number(pembayaran.nominalDisetor);
+    const prevTerbayar = Number(tagihan.nominalTerbayar || 0);
+    const nominalAkhir = Number(tagihan.nominalAkhir);
+    const newTerbayar = prevTerbayar + disetor;
+
+    const isFullyPaid = newTerbayar >= nominalAkhir;
+    const finalStatus = isFullyPaid ? "LUNAS" : "DIBAYAR_SEBAGIAN";
+
+    // Approve final
+    await (prisma as any).pembayaran.update({
       where: { id: data.pembayaranId },
       data: {
         approvedAt: new Date(),
+        approvedByUserId: session.user.id,
         catatanBendahara: data.catatan || "Disetujui oleh Bendahara.",
       },
     });
 
-    await prisma.tagihan.update({
-      where: { id: pembayaran.tagihanId },
-      data: { status: "LUNAS" },
+    await (prisma as any).tagihan.update({
+      where: { id: tagihan.id },
+      data: {
+        nominalTerbayar: newTerbayar,
+        status: finalStatus,
+      },
     });
+
+    // AuditLog
+    await (prisma as any).auditLog.create({
+      data: {
+        userId: session.user.id,
+        action: "APPROVE_PAYMENT_BENDAHARA",
+        entityType: "Pembayaran",
+        entityId: pembayaran.id,
+        details: JSON.stringify({
+          tagihanId: tagihan.id,
+          disetor,
+          totalTerbayar: newTerbayar,
+          finalStatus,
+        }),
+      },
+    });
+
+    const setoranFormat = formatIDR(disetor);
 
     // Notifikasi ke Wali
     await createNotification(
       waliUserId,
-      "🎉 Pembayaran LUNAS!",
-      `Pembayaran ${jenisName} sebesar ${nominal} untuk ${siswa.name} telah disetujui dan berstatus LUNAS. Terima kasih!`
+      isFullyPaid ? "🎉 Pembayaran LUNAS!" : "💳 Pembayaran Cicilan Disetujui",
+      isFullyPaid
+        ? `Pembayaran ${jenisName} sebesar ${setoranFormat} untuk ${siswa.name} telah disetujui dan berstatus LUNAS. Terima kasih!`
+        : `Pembayaran cicilan ${jenisName} sebesar ${setoranFormat} untuk ${siswa.name} telah disetujui. Sisa tagihan: ${formatIDR(nominalAkhir - newTerbayar)}.`
     );
 
     // Notifikasi ke Admin
     await notifyByRole(
       "ADMIN",
-      "Pembayaran Lunas",
-      `Pembayaran ${jenisName} dari ${siswa.name} telah disetujui Bendahara dan berstatus LUNAS.`
+      isFullyPaid ? "Pembayaran Lunas" : "Pembayaran Parsial Disetujui",
+      `Pembayaran ${jenisName} dari ${siswa.name} (${setoranFormat}) telah disetujui Bendahara.`
     );
 
     // WA ke Wali
     if (waliPhone) {
+      const waMsg = isFullyPaid
+        ? `🎉 Alhamdulillah! Pembayaran ${jenisName} sebesar ${setoranFormat} untuk ${siswa.name} telah LUNAS.\n\nTerima kasih atas pembayaran Anda. Kwitansi dapat diunduh melalui aplikasi Saku Santri. 🙏`
+        : `💳 Pembayaran Cicilan Disetujui!\n\nPembayaran ${jenisName} sebesar ${setoranFormat} untuk ${siswa.name} telah diterima.\nTotal Terbayar: ${formatIDR(newTerbayar)} dari ${formatIDR(nominalAkhir)}\nSisa Tagihan: ${formatIDR(nominalAkhir - newTerbayar)}\n\nTerima kasih. 🙏`;
+
       sendWhatsAppMessage({
         targetPhone: waliPhone,
-        message: `🎉 Alhamdulillah! Pembayaran ${jenisName} sebesar ${nominal} untuk ${siswa.name} telah LUNAS.\n\nTerima kasih atas pembayaran Anda. Kwitansi dapat diunduh melalui aplikasi Saku Santri. 🙏`,
+        message: waMsg,
       }).catch((err) => console.error("Gagal kirim WA:", err));
     }
   } else {
-    // Reject → kembali ke Wali
+    // Reject → kembali ke Wali (jika belum pernah bayar) atau DIBAYAR_SEBAGIAN (jika sudah ada terbayar)
     if (!data.catatan || data.catatan.trim().length === 0) {
       throw new Error("Alasan penolakan wajib diisi.");
     }
 
-    await prisma.pembayaran.update({
+    const prevTerbayar = Number(tagihan.nominalTerbayar || 0);
+    const rollbackStatus = prevTerbayar > 0 ? "DIBAYAR_SEBAGIAN" : "DITOLAK_BENDAHARA";
+
+    await (prisma as any).pembayaran.update({
       where: { id: data.pembayaranId },
       data: {
         catatanBendahara: data.catatan,
       },
     });
 
-    await prisma.tagihan.update({
-      where: { id: pembayaran.tagihanId },
-      data: { status: "DITOLAK_BENDAHARA" },
+    await (prisma as any).tagihan.update({
+      where: { id: tagihan.id },
+      data: { status: rollbackStatus },
+    });
+
+    // AuditLog
+    await (prisma as any).auditLog.create({
+      data: {
+        userId: session.user.id,
+        action: "REJECT_PAYMENT_BENDAHARA",
+        entityType: "Pembayaran",
+        entityId: pembayaran.id,
+        details: JSON.stringify({ reason: data.catatan }),
+      },
     });
 
     // Notifikasi ke Wali
@@ -336,7 +422,7 @@ export async function bendaharaApprovePayment(data: {
       `Pembayaran ${jenisName} untuk ${siswa.name} ditolak oleh Bendahara. Alasan: ${data.catatan}. Silakan hubungi pihak sekolah.`
     );
 
-    // Notifikasi ke Admin (agar mengetahui penolakan)
+    // Notifikasi ke Admin
     await notifyByRole(
       "ADMIN",
       "Pembayaran Ditolak Bendahara",
@@ -361,7 +447,7 @@ export async function bendaharaApprovePayment(data: {
   return {
     success: true,
     message: data.action === "approve"
-      ? "Pembayaran disetujui dan berstatus LUNAS."
+      ? "Pembayaran disetujui."
       : "Pembayaran ditolak. Wali murid akan diberitahu.",
   };
 }

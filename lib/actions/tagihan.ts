@@ -104,7 +104,7 @@ export async function generateMonthlyBills(data: {
     throw new Error('Format periode harus "YYYY-MM" (contoh: "2025-09").');
   }
 
-  // Ambil jenis tagihan untuk mendapatkan nominal standar
+  // Ambil jenis tagihan
   const jenisTagihan = await prisma.jenisTagihan.findUnique({
     where: { id: data.jenisTagihanId },
   });
@@ -120,8 +120,9 @@ export async function generateMonthlyBills(data: {
     throw new Error("Tahun ajaran tidak ditemukan.");
   }
 
-  // Ambil semua siswa aktif
-  const allSiswa = await prisma.siswa.findMany({
+  // Ambil semua siswa AKTIF sahaja
+  const allSiswa: any[] = await (prisma as any).siswa.findMany({
+    where: { status: "AKTIF" },
     include: {
       wali: {
         include: {
@@ -132,7 +133,7 @@ export async function generateMonthlyBills(data: {
   });
 
   if (allSiswa.length === 0) {
-    throw new Error("Tidak ada siswa terdaftar di database.");
+    throw new Error("Tidak ada siswa AKTIF terdaftar di database.");
   }
 
   // Cek tagihan duplikat untuk periode ini
@@ -152,17 +153,20 @@ export async function generateMonthlyBills(data: {
 
   if (siswaToGenerate.length === 0) {
     throw new Error(
-      `Semua siswa sudah memiliki tagihan ${jenisTagihan.name} untuk periode ${data.period}.`
+      `Semua siswa aktif sudah memiliki tagihan ${jenisTagihan.name} untuk periode ${data.period}.`
     );
   }
 
   const nominalAwalNum = Number(jenisTagihan.nominal);
   const dueDate = new Date(data.dueDate);
+  const isBulanan = jenisTagihan.type === "BULANAN";
 
   // Buat data tagihan untuk setiap siswa
   const tagihanData = siswaToGenerate.map((siswa: any) => {
-    const potonganNum = Number(siswa.potonganTetap);
+    // Potongan beasiswa HANYA berlaku untuk jenis tagihan BULANAN
+    const potonganNum = isBulanan ? Number(siswa.potonganTetap) : 0;
     const nominalAkhirNum = Math.max(0, nominalAwalNum - potonganNum);
+    const autoLunas = nominalAkhirNum === 0;
 
     return {
       siswaId: siswa.id,
@@ -171,10 +175,13 @@ export async function generateMonthlyBills(data: {
       nominalAwal: nominalAwalNum,
       potongan: potonganNum,
       nominalAkhir: nominalAkhirNum,
+      nominalTerbayar: autoLunas ? nominalAwalNum : 0,
       dueDate,
       period: data.period,
-      status: "BELUM_BAYAR" as const,
-      catatanTagihan: potonganNum > 0
+      status: autoLunas ? ("LUNAS" as const) : ("BELUM_BAYAR" as const),
+      catatanTagihan: autoLunas
+        ? "Lunas otomatis (Beasiswa 100%)"
+        : potonganNum > 0
         ? `Potongan beasiswa: Rp ${potonganNum.toLocaleString("id-ID")}`
         : null,
     };
@@ -257,17 +264,47 @@ export async function createManualBill(data: {
     throw new Error("Nominal tagihan harus lebih dari 0.");
   }
 
+  const jenisTagihan = await prisma.jenisTagihan.findUnique({
+    where: { id: data.jenisTagihanId },
+  });
+  if (!jenisTagihan) {
+    throw new Error("Jenis tagihan tidak ditemukan.");
+  }
+
   const dueDate = new Date(data.dueDate);
   const nominalAwalNum = data.nominalAwal;
+  const isBulanan = jenisTagihan.type === "BULANAN";
 
-  // Ambil data siswa untuk menghitung potongan
+  // Cek duplikasi tagihan manual untuk siswa-siswa ini jika ada periode
+  const existingBills = data.period
+    ? await prisma.tagihan.findMany({
+        where: {
+          jenisTagihanId: data.jenisTagihanId,
+          tahunAjaranId: data.tahunAjaranId,
+          period: data.period,
+          siswaId: { in: data.siswaIds },
+        },
+        select: { siswaId: true },
+      })
+    : [];
+
+  const existingSiswaIds = new Set(existingBills.map((b: any) => b.siswaId));
+  const targetSiswaIds = data.siswaIds.filter((id) => !existingSiswaIds.has(id));
+
+  if (targetSiswaIds.length === 0) {
+    throw new Error("Semua siswa yang dipilih sudah memiliki tagihan ini untuk periode tersebut.");
+  }
+
+  // Ambil data siswa
   const siswaList = await prisma.siswa.findMany({
-    where: { id: { in: data.siswaIds } },
+    where: { id: { in: targetSiswaIds } },
   });
 
   const tagihanData = siswaList.map((siswa: any) => {
-    const potonganNum = Number(siswa.potonganTetap);
+    // Beasiswa hanya memotong jika jenis tagihan adalah BULANAN
+    const potonganNum = isBulanan ? Number(siswa.potonganTetap) : 0;
     const nominalAkhirNum = Math.max(0, nominalAwalNum - potonganNum);
+    const autoLunas = nominalAkhirNum === 0;
 
     return {
       siswaId: siswa.id,
@@ -276,10 +313,11 @@ export async function createManualBill(data: {
       nominalAwal: nominalAwalNum,
       potongan: potonganNum,
       nominalAkhir: nominalAkhirNum,
+      nominalTerbayar: autoLunas ? nominalAwalNum : 0,
       dueDate,
       period: data.period || "",
       catatanTagihan: data.catatanTagihan || null,
-      status: "BELUM_BAYAR" as const,
+      status: autoLunas ? ("LUNAS" as const) : ("BELUM_BAYAR" as const),
     };
   });
 
@@ -293,7 +331,8 @@ export async function createManualBill(data: {
   return {
     success: true,
     generated: result.count,
-    message: `${result.count} tagihan manual berhasil dibuat.`,
+    skipped: existingSiswaIds.size,
+    message: `${result.count} tagihan manual berhasil dibuat. ${existingSiswaIds.size > 0 ? `${existingSiswaIds.size} dilewati (sudah ada).` : ""}`,
   };
 }
 
@@ -366,12 +405,10 @@ export async function deleteTagihan(id: string) {
     throw new Error("Hanya tagihan berstatus BELUM BAYAR yang dapat dihapus.");
   }
 
-  // Hapus pembayaran terkait jika ada
-  if (tagihan.pembayaran) {
-    await prisma.pembayaran.delete({
-      where: { id: tagihan.pembayaran.id },
-    });
-  }
+  // Hapus semua pembayaran terkait jika ada
+  await prisma.pembayaran.deleteMany({
+    where: { tagihanId: id },
+  });
 
   await prisma.tagihan.delete({
     where: { id },

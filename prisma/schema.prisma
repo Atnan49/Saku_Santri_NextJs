@@ -8,18 +8,21 @@ datasource db {
 }
 
 model User {
-  id              String              @id @default(uuid()) @db.Uuid
-  username        String              @unique
-  email           String?             @unique
-  phone           String?             @unique
-  passwordHash    String
-  name            String
-  role            UserRole
-  createdAt       DateTime            @default(now())
-  updatedAt       DateTime            @updatedAt
-  wali            WaliMurid?
-  notifications   Notification[]
-  transaksiKasir  TransaksiKoperasi[]
+  id                String              @id @default(uuid()) @db.Uuid
+  username          String              @unique
+  email             String?             @unique
+  phone             String?             @unique
+  passwordHash      String
+  name              String
+  role              UserRole
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  wali              WaliMurid?
+  notifications     Notification[]
+  transaksiKasir    TransaksiKoperasi[]
+  verifiedPayments  Pembayaran[]        @relation("VerifiedPayments")
+  approvedPayments  Pembayaran[]        @relation("ApprovedPayments")
+  auditLogs         AuditLog[]
 }
 
 model WaliMurid {
@@ -47,6 +50,7 @@ model Siswa {
   id            String              @id @default(uuid()) @db.Uuid
   nisn          String              @unique
   name          String
+  status        SiswaStatus         @default(AKTIF)
   kelas         Kelas               @relation(fields: [kelasId], references: [id])
   kelasId       String              @db.Uuid
   wali          WaliMurid           @relation(fields: [waliId], references: [id])
@@ -80,11 +84,12 @@ model Tagihan {
   nominalAwal    Decimal
   potongan       Decimal        @default("0.0")
   nominalAkhir   Decimal
+  nominalTerbayar Decimal       @default("0.0")
   dueDate        DateTime
   period         String
   status         TagihanStatus  @default(BELUM_BAYAR)
   catatanTagihan String?
-  pembayaran     Pembayaran?
+  pembayaran     Pembayaran[]
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
 }
@@ -92,13 +97,18 @@ model Tagihan {
 model Pembayaran {
   id               String    @id @default(uuid()) @db.Uuid
   tagihan          Tagihan   @relation(fields: [tagihanId], references: [id])
-  tagihanId        String    @unique @db.Uuid
+  tagihanId        String    @db.Uuid
+  nominalDisetor   Decimal   @default("0.0")
   buktiUrl         String?
   catatanWali      String?
   catatanAdmin     String?
   catatanBendahara String?
   verifiedAt       DateTime?
+  verifiedByUserId String?   @db.Uuid
+  verifiedByUser   User?     @relation("VerifiedPayments", fields: [verifiedByUserId], references: [id])
   approvedAt       DateTime?
+  approvedByUserId String?   @db.Uuid
+  approvedByUser   User?     @relation("ApprovedPayments", fields: [approvedByUserId], references: [id])
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 }
@@ -138,11 +148,36 @@ model Notification {
   createdAt DateTime @default(now())
 }
 
+model InstitutionSettings {
+  id        String   @id @default(uuid()) @db.Uuid
+  key       String   @unique
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+model AuditLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String   @db.Uuid
+  user       User     @relation(fields: [userId], references: [id])
+  action     String
+  entityType String
+  entityId   String   @db.Uuid
+  details    String?
+  createdAt  DateTime @default(now())
+}
+
 enum UserRole {
   ADMIN
   WALIMURID
   BENDAHARA
   KOPERASI
+}
+
+enum SiswaStatus {
+  AKTIF
+  ALUMNI
+  KELUAR
+  CUTI
 }
 
 enum TagihanType {
@@ -153,6 +188,7 @@ enum TagihanType {
 
 enum TagihanStatus {
   BELUM_BAYAR
+  DIBAYAR_SEBAGIAN
   MENUNGGU_VERIFIKASI_ADMIN
   MENUNGGU_APPROVAL_BENDAHARA
   LUNAS

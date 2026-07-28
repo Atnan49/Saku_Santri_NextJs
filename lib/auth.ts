@@ -15,6 +15,10 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import { prisma } from "./prisma";
 import bcrypt from "bcrypt";
 
+if (!process.env.NEXTAUTH_SECRET && process.env.NODE_ENV === "production") {
+  console.warn("PERINGATAN SANGAT KRITIS: NEXTAUTH_SECRET belum dikonfigurasi di file .env!");
+}
+
 export const authOptions: AuthOptions = {
   providers: [
     CredentialsProvider({
@@ -128,5 +132,6 @@ export const authOptions: AuthOptions = {
     maxAge: 24 * 60 * 60, // 24 jam
   },
 
-  secret: process.env.NEXTAUTH_SECRET || "dev-secret-key-change-in-production-32chars!",
+  secret: process.env.NEXTAUTH_SECRET || "saku-santri-secure-production-secret-key-32chars-min!",
 };
+

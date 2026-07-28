@@ -66,13 +66,16 @@ export default async function KwitansiDigitalPage({ params }: PageProps) {
   if (!tagihan) notFound();
 
   const { siswa, jenisTagihan, pembayaran } = tagihan;
+  const latestPayment = Array.isArray(pembayaran)
+    ? (pembayaran.length > 0 ? pembayaran[pembayaran.length - 1] : null)
+    : (pembayaran ? (pembayaran as any) : null);
   const waliNama = siswa.wali.user.name;
   const siswaNama = siswa.name;
   const kelasNama = siswa.kelas.name;
   const nominal = tagihan.nominalAkhir;
   const isLunas = tagihan.status === "LUNAS";
-  const nomorKwitansi = generateNomorKwitansi(tagihan.id, pembayaran?.approvedAt ?? null);
-  const tanggalApproved = pembayaran?.approvedAt ?? pembayaran?.verifiedAt ?? tagihan.updatedAt;
+  const nomorKwitansi = generateNomorKwitansi(tagihan.id, latestPayment?.approvedAt ?? null);
+  const tanggalApproved = latestPayment?.approvedAt ?? latestPayment?.verifiedAt ?? tagihan.updatedAt;
   const gunaMembayr = `Pembayaran ${jenisTagihan.name} Periode ${tagihan.period} - Tahun Ajaran ${tagihan.tahunAjaran.year}.`;
 
   return (

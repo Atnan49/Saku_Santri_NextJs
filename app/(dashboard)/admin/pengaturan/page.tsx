@@ -15,6 +15,7 @@ import { formatIDR } from "@/lib/utils";
 import { getTahunAjaranList, createTahunAjaran, setActiveTahunAjaran } from "@/lib/actions/tahun-ajaran";
 import { getJenisTagihanList, createJenisTagihan, updateJenisTagihan } from "@/lib/actions/jenis-tagihan";
 import { getWaliMuridList, updateUserPassword } from "@/lib/actions/user";
+import { getInstitutionSettings, updateInstitutionSettings } from "@/lib/actions/settings";
 import {
   Settings,
   Calendar,
@@ -52,11 +53,16 @@ export default function AdminPengaturanPage() {
   const [jenisList, setJenisList] = useState<any[]>([]);
   const [savingJenis, setSavingJenis] = useState(false);
 
-  // Form State Rekening Bank
-  const [bankBca, setBankBca] = useState("1234567890");
-  const [bankBsi, setBankBsi] = useState("7700123456");
-  const [atasNama, setAtasNama] = useState("Yayasan Pondok Pesantren");
+  // Form State Rekening Bank & Institusi
+  const [instName, setInstName] = useState("Pesantren Digital Saku Santri");
+  const [bank1Name, setBank1Name] = useState("BANK SYARIAH INDONESIA (BSI)");
+  const [bank1Acc, setBank1Acc] = useState("7182 9910 22");
+  const [bank1Holder, setBank1Holder] = useState("a.n. Yayasan Pendidikan Digital");
+  const [bank2Name, setBank2Name] = useState("BANK MANDIRI");
+  const [bank2Acc, setBank2Acc] = useState("131 00 2938 1192");
+  const [bank2Holder, setBank2Holder] = useState("a.n. Yayasan Pendidikan Digital");
   const [bankSavedAlert, setBankSavedAlert] = useState(false);
+  const [savingBank, setSavingBank] = useState(false);
 
   // State Wali Murid
   const [waliList, setWaliList] = useState<any[]>([]);
@@ -64,10 +70,11 @@ export default function AdminPengaturanPage() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [tData, jData, wData] = await Promise.all([
+      const [tData, jData, wData, settings] = await Promise.all([
         getTahunAjaranList(),
         getJenisTagihanList(),
         getWaliMuridList(),
+        getInstitutionSettings(),
       ]);
       setTahunList(tData);
       setJenisList(jData);
@@ -79,13 +86,14 @@ export default function AdminPengaturanPage() {
         setNominalSPP(String(sppMaster.nominal));
       }
 
-      // Load data rekening bank dari localStorage jika tersedia
-      const savedBca = localStorage.getItem("bank_bca");
-      const savedBsi = localStorage.getItem("bank_bsi");
-      const savedAtasNama = localStorage.getItem("bank_atas_nama");
-      if (savedBca) setBankBca(savedBca);
-      if (savedBsi) setBankBsi(savedBsi);
-      if (savedAtasNama) setAtasNama(savedAtasNama);
+      // Load settings
+      setInstName(settings.INSTITUTION_NAME);
+      setBank1Name(settings.BANK_NAME_1);
+      setBank1Acc(settings.BANK_ACC_1);
+      setBank1Holder(settings.BANK_HOLDER_1);
+      setBank2Name(settings.BANK_NAME_2);
+      setBank2Acc(settings.BANK_ACC_2);
+      setBank2Holder(settings.BANK_HOLDER_2);
     } catch (err) {
       console.error("Gagal memuat pengaturan:", err);
     } finally {
@@ -149,13 +157,26 @@ export default function AdminPengaturanPage() {
     }
   };
 
-  const handleSaveBank = (e: React.FormEvent) => {
+  const handleSaveBank = async (e: React.FormEvent) => {
     e.preventDefault();
-    localStorage.setItem("bank_bca", bankBca);
-    localStorage.setItem("bank_bsi", bankBsi);
-    localStorage.setItem("bank_atas_nama", atasNama);
-    setBankSavedAlert(true);
-    setTimeout(() => setBankSavedAlert(false), 2000);
+    setSavingBank(true);
+    try {
+      await updateInstitutionSettings({
+        INSTITUTION_NAME: instName.trim(),
+        BANK_NAME_1: bank1Name.trim(),
+        BANK_ACC_1: bank1Acc.trim(),
+        BANK_HOLDER_1: bank1Holder.trim(),
+        BANK_NAME_2: bank2Name.trim(),
+        BANK_ACC_2: bank2Acc.trim(),
+        BANK_HOLDER_2: bank2Holder.trim(),
+      });
+      setBankSavedAlert(true);
+      setTimeout(() => setBankSavedAlert(false), 2000);
+    } catch (err: any) {
+      alert(err.message || "Gagal menyimpan data rekening.");
+    } finally {
+      setSavingBank(false);
+    }
   };
 
   const handleAddTahun = async (e: React.FormEvent) => {
@@ -432,10 +453,10 @@ export default function AdminPengaturanPage() {
                   </div>
                   <div>
                     <h3 style={{ fontSize: "1.1rem", fontWeight: 800, color: "var(--text-main)" }}>
-                      Rekening Bank Pembayaran Pesantren
+                      Pengaturan Rekening Bank & Informasi Pesantren
                     </h3>
                     <p style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>
-                      Nomor rekening ini ditampilkan ke Wali Murid saat melakukan transfer setoran.
+                      Informasi ini ditampilkan secara dinamis ke Wali Murid saat melakukan transfer setoran.
                     </p>
                   </div>
                 </div>
@@ -443,49 +464,122 @@ export default function AdminPengaturanPage() {
                 {bankSavedAlert && (
                   <div style={{ backgroundColor: "var(--status-lunas-bg)", border: "1px solid var(--status-lunas)", borderRadius: "6px", padding: "0.75rem 1rem", color: "var(--status-lunas)", fontSize: "0.85rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
                     <CheckCircle2 size={18} />
-                    <span>Rekening Bank Pesantren berhasil diperbarui!</span>
+                    <span>Data rekening bank & institusi berhasil diperbarui!</span>
                   </div>
                 )}
 
-                <form onSubmit={handleSaveBank} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                <form onSubmit={handleSaveBank} style={{ display: "flex", flexDirection: "column", gap: "1.2rem" }}>
                   <div>
-                    <label style={{ fontSize: "0.75rem", fontWeight: 800, textTransform: "uppercase", color: "var(--text-muted)" }}>Atas Nama Rekening (Pemilik)</label>
+                    <label style={{ fontSize: "0.75rem", fontWeight: 800, textTransform: "uppercase", color: "var(--text-muted)" }}>Nama Institusi / Pesantren</label>
                     <input
                       type="text"
                       required
-                      placeholder="Yayasan Pondok Pesantren..."
-                      value={atasNama}
-                      onChange={(e) => setAtasNama(e.target.value)}
+                      placeholder="Pesantren Digital Saku Santri"
+                      value={instName}
+                      onChange={(e) => setInstName(e.target.value)}
                       style={{ width: "100%", padding: "0.65rem 0.85rem", border: "1px solid var(--border-glass)", borderRadius: "6px", backgroundColor: "var(--bg-app)", fontSize: "0.9rem", marginTop: "0.2rem" }}
                     />
                   </div>
 
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
-                    <div>
-                      <label style={{ fontSize: "0.75rem", fontWeight: 800, textTransform: "uppercase", color: "var(--text-muted)" }}>No. Rekening BCA</label>
-                      <input
-                        type="text"
-                        placeholder="1234567890"
-                        value={bankBca}
-                        onChange={(e) => setBankBca(e.target.value)}
-                        style={{ width: "100%", padding: "0.65rem 0.85rem", border: "1px solid var(--border-glass)", borderRadius: "6px", backgroundColor: "var(--bg-app)", fontSize: "0.9rem", marginTop: "0.2rem" }}
-                      />
+                  {/* Rekening Utama (Bank 1) */}
+                  <div style={{ border: "1px dashed var(--border-glass)", padding: "1rem", borderRadius: "8px", display: "flex", flexDirection: "column", gap: "0.8rem" }}>
+                    <span style={{ fontSize: "0.8rem", fontWeight: 800, color: "var(--primary)" }}>REKENING UTAMA (BANK 1)</span>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+                      <div>
+                        <label style={{ fontSize: "0.72rem", fontWeight: 700, color: "var(--text-muted)" }}>Nama Bank</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="BANK SYARIAH INDONESIA (BSI)"
+                          value={bank1Name}
+                          onChange={(e) => setBank1Name(e.target.value)}
+                          style={{ width: "100%", padding: "0.55rem 0.75rem", border: "1px solid var(--border-glass)", borderRadius: "6px", backgroundColor: "var(--bg-app)", fontSize: "0.85rem" }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: "0.72rem", fontWeight: 700, color: "var(--text-muted)" }}>No. Rekening</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="7182 9910 22"
+                          value={bank1Acc}
+                          onChange={(e) => setBank1Acc(e.target.value)}
+                          style={{ width: "100%", padding: "0.55rem 0.75rem", border: "1px solid var(--border-glass)", borderRadius: "6px", backgroundColor: "var(--bg-app)", fontSize: "0.85rem" }}
+                        />
+                      </div>
                     </div>
-
                     <div>
-                      <label style={{ fontSize: "0.75rem", fontWeight: 800, textTransform: "uppercase", color: "var(--text-muted)" }}>No. Rekening BSI</label>
+                      <label style={{ fontSize: "0.72rem", fontWeight: 700, color: "var(--text-muted)" }}>Atas Nama (Pemilik Rekening)</label>
                       <input
                         type="text"
-                        placeholder="7700123456"
-                        value={bankBsi}
-                        onChange={(e) => setBankBsi(e.target.value)}
-                        style={{ width: "100%", padding: "0.65rem 0.85rem", border: "1px solid var(--border-glass)", borderRadius: "6px", backgroundColor: "var(--bg-app)", fontSize: "0.9rem", marginTop: "0.2rem" }}
+                        required
+                        placeholder="a.n. Yayasan Pendidikan Digital"
+                        value={bank1Holder}
+                        onChange={(e) => setBank1Holder(e.target.value)}
+                        style={{ width: "100%", padding: "0.55rem 0.75rem", border: "1px solid var(--border-glass)", borderRadius: "6px", backgroundColor: "var(--bg-app)", fontSize: "0.85rem" }}
                       />
                     </div>
                   </div>
 
-                  <button type="submit" style={{ padding: "0.75rem", backgroundColor: "var(--primary)", color: "#fff", border: "none", borderRadius: "6px", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem" }}>
-                    <Save size={18} /> Simpan Data Rekening
+                  {/* Rekening Sekunder (Bank 2) */}
+                  <div style={{ border: "1px dashed var(--border-glass)", padding: "1rem", borderRadius: "8px", display: "flex", flexDirection: "column", gap: "0.8rem" }}>
+                    <span style={{ fontSize: "0.8rem", fontWeight: 800, color: "var(--primary)" }}>REKENING ALTERNATIF (BANK 2)</span>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+                      <div>
+                        <label style={{ fontSize: "0.72rem", fontWeight: 700, color: "var(--text-muted)" }}>Nama Bank</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="BANK MANDIRI"
+                          value={bank2Name}
+                          onChange={(e) => setBank2Name(e.target.value)}
+                          style={{ width: "100%", padding: "0.55rem 0.75rem", border: "1px solid var(--border-glass)", borderRadius: "6px", backgroundColor: "var(--bg-app)", fontSize: "0.85rem" }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: "0.72rem", fontWeight: 700, color: "var(--text-muted)" }}>No. Rekening</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="131 00 2938 1192"
+                          value={bank2Acc}
+                          onChange={(e) => setBank2Acc(e.target.value)}
+                          style={{ width: "100%", padding: "0.55rem 0.75rem", border: "1px solid var(--border-glass)", borderRadius: "6px", backgroundColor: "var(--bg-app)", fontSize: "0.85rem" }}
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label style={{ fontSize: "0.72rem", fontWeight: 700, color: "var(--text-muted)" }}>Atas Nama (Pemilik Rekening)</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="a.n. Yayasan Pendidikan Digital"
+                        value={bank2Holder}
+                        onChange={(e) => setBank2Holder(e.target.value)}
+                        style={{ width: "100%", padding: "0.55rem 0.75rem", border: "1px solid var(--border-glass)", borderRadius: "6px", backgroundColor: "var(--bg-app)", fontSize: "0.85rem" }}
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={savingBank}
+                    style={{
+                      padding: "0.75rem",
+                      backgroundColor: "var(--primary)",
+                      color: "#fff",
+                      border: "none",
+                      borderRadius: "6px",
+                      fontWeight: 800,
+                      cursor: savingBank ? "not-allowed" : "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "0.5rem",
+                    }}
+                  >
+                    {savingBank ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
+                    <span>{savingBank ? "Menyimpan..." : "SIMPAN PENGATURAN REKENING"}</span>
                   </button>
                 </form>
               </GlassCard>

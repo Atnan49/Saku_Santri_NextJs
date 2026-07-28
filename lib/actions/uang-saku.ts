@@ -247,113 +247,117 @@ export async function processTransaksiKoperasi(data: {
     throw new Error("Total belanja harus lebih dari Rp 0.");
   }
 
-  // Cari siswa berdasarkan NISN
-  const siswa = await prisma.siswa.findUnique({
-    where: { nisn: data.nisn.trim() },
-    include: {
-      kelas: { select: { name: true } },
-      wali: {
-        include: {
-          user: { select: { id: true, phone: true, name: true } },
+  const cleanNisn = data.nisn.trim();
+
+  // Eksekusi seluruh alur validasi & update dalam SATU Interactive Transaction untuk cegah Race Condition
+  return await prisma.$transaction(async (tx) => {
+    // 1. Cari & Kunci data siswa
+    const siswa = await tx.siswa.findUnique({
+      where: { nisn: cleanNisn },
+      include: {
+        kelas: { select: { name: true } },
+        wali: {
+          include: {
+            user: { select: { id: true, phone: true, name: true } },
+          },
         },
       },
-    },
-  });
+    });
 
-  if (!siswa) {
-    throw new Error(`Siswa dengan NISN "${data.nisn}" tidak ditemukan.`);
-  }
+    if (!siswa) {
+      throw new Error(`Siswa dengan NISN "${cleanNisn}" tidak ditemukan.`);
+    }
 
-  const currentSaldo = Number(siswa.saldoSaku);
-  const limitHarian = Number(siswa.limitHarian);
+    const currentSaldo = Number(siswa.saldoSaku);
+    const limitHarian = Number(siswa.limitHarian);
 
-  // 1. Validasi Saldo Cukup
-  if (currentSaldo < data.totalBelanja) {
-    throw new Error(
-      `Saldo saku ${siswa.name} tidak mencukupi (Saldo: ${formatIDR(currentSaldo)}, Belanja: ${formatIDR(data.totalBelanja)}).`
-    );
-  }
+    // 2. Validasi Saldo Cukup
+    if (currentSaldo < data.totalBelanja) {
+      throw new Error(
+        `Saldo saku ${siswa.name} tidak mencukupi (Saldo: ${formatIDR(currentSaldo)}, Belanja: ${formatIDR(data.totalBelanja)}).`
+      );
+    }
 
-  // 2. Validasi Limit Harian Jajan
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
+    // 3. Validasi Limit Harian Jajan
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
 
-  const todayEnd = new Date();
-  todayEnd.setHours(23, 59, 59, 999);
+    const todayEnd = new Date();
+    todayEnd.setHours(23, 59, 59, 999);
 
-  // Hitung total belanja siswa hari ini
-  const todayPurchases = await prisma.transaksiKoperasi.aggregate({
-    _sum: { totalBelanja: true },
-    where: {
-      siswaId: siswa.id,
-      createdAt: {
-        gte: todayStart,
-        lte: todayEnd,
+    const todayPurchases = await tx.transaksiKoperasi.aggregate({
+      _sum: { totalBelanja: true },
+      where: {
+        siswaId: siswa.id,
+        createdAt: {
+          gte: todayStart,
+          lte: todayEnd,
+        },
       },
-    },
-  });
+    });
 
-  const spentToday = todayPurchases._sum.totalBelanja
-    ? Number(todayPurchases._sum.totalBelanja)
-    : 0;
+    const spentToday = todayPurchases._sum.totalBelanja
+      ? Number(todayPurchases._sum.totalBelanja)
+      : 0;
 
-  if (spentToday + data.totalBelanja > limitHarian) {
-    const remainingLimit = Math.max(0, limitHarian - spentToday);
-    throw new Error(
-      `Transaksi ditolak! Belanja melebihi limit harian ${siswa.name}.\nLimit Harian: ${formatIDR(limitHarian)}\nSudah Belanja Hari Ini: ${formatIDR(spentToday)}\nSisa Limit Hari Ini: ${formatIDR(remainingLimit)}`
-    );
-  }
+    if (spentToday + data.totalBelanja > limitHarian) {
+      const remainingLimit = Math.max(0, limitHarian - spentToday);
+      throw new Error(
+        `Transaksi ditolak! Belanja melebihi limit harian ${siswa.name}.\nLimit Harian: ${formatIDR(limitHarian)}\nSudah Belanja Hari Ini: ${formatIDR(spentToday)}\nSisa Limit Hari Ini: ${formatIDR(remainingLimit)}`
+      );
+    }
 
-  // 3. Eksekusi Transaksi (Potong saldo & catat transaksi secara Atomic Transaction)
-  const [transaksi] = await prisma.$transaction([
-    prisma.transaksiKoperasi.create({
+    // 4. Catat Transaksi Koperasi
+    const transaksi = await tx.transaksiKoperasi.create({
       data: {
         siswaId: siswa.id,
         kasirId: session.user.id,
         totalBelanja: data.totalBelanja,
         catatanBarang: data.catatanBarang || null,
       },
-    }),
-    prisma.siswa.update({
+    });
+
+    // 5. Potong Saldo Siswa
+    const updatedSiswa = await tx.siswa.update({
       where: { id: siswa.id },
       data: {
         saldoSaku: { decrement: data.totalBelanja },
       },
-    }),
-  ]);
+    });
 
-  const sisaSaldo = currentSaldo - data.totalBelanja;
-  const sisaLimit = limitHarian - (spentToday + data.totalBelanja);
-  const waliUserId = siswa.wali.user.id;
-  const waliPhone = siswa.wali.user.phone;
-  const totalBelanjaFormat = formatIDR(data.totalBelanja);
+    const newSaldo = Number(updatedSiswa.saldoSaku);
+    const sisaLimit = limitHarian - (spentToday + data.totalBelanja);
+    const waliUserId = siswa.wali.user.id;
+    const waliPhone = siswa.wali.user.phone;
+    const totalBelanjaFormat = formatIDR(data.totalBelanja);
 
-  // Notifikasi in-app ke Wali
-  await createNotification(
-    waliUserId,
-    "Transaksi Koperasi Sekolah 🛒",
-    `${siswa.name} telah berbelanja ${totalBelanjaFormat} di Koperasi (${data.catatanBarang || "Barang Koperasi"}). Sisa saldo: ${formatIDR(sisaSaldo)}.`
-  );
+    // Notifikasi in-app ke Wali (async)
+    createNotification(
+      waliUserId,
+      "Transaksi Koperasi Sekolah 🛒",
+      `${siswa.name} telah berbelanja ${totalBelanjaFormat} di Koperasi (${data.catatanBarang || "Barang Koperasi"}). Sisa saldo: ${formatIDR(newSaldo)}.`
+    ).catch((err) => console.error("Gagal buat notifikasi:", err));
 
-  // Kirim WA Notifikasi ke Wali (real-time)
-  if (waliPhone) {
-    const itemsText = data.catatanBarang ? `\nBarang: ${data.catatanBarang}` : "";
-    sendWhatsAppMessage({
-      targetPhone: waliPhone,
-      message: `🛒 Transaksi Koperasi / Mart Sekolah\n\nSantri: ${siswa.name} (${siswa.kelas.name})\nTotal Belanja: ${totalBelanjaFormat}${itemsText}\n\nSisa Saldo Saku: ${formatIDR(sisaSaldo)}\nSisa Limit Hari Ini: ${formatIDR(sisaLimit)}\n\nTerima kasih. 🙏`,
-    }).catch((err) => console.error("Gagal kirim WA:", err));
-  }
+    // Kirim WA Notifikasi ke Wali (async)
+    if (waliPhone) {
+      const itemsText = data.catatanBarang ? `\nBarang: ${data.catatanBarang}` : "";
+      sendWhatsAppMessage({
+        targetPhone: waliPhone,
+        message: `🛒 Transaksi Koperasi / Mart Sekolah\n\nSantri: ${siswa.name} (${siswa.kelas.name})\nTotal Belanja: ${totalBelanjaFormat}${itemsText}\n\nSisa Saldo Saku: ${formatIDR(newSaldo)}\nSisa Limit Hari Ini: ${formatIDR(sisaLimit)}\n\nTerima kasih. 🙏`,
+      }).catch((err) => console.error("Gagal kirim WA:", err));
+    }
 
-  revalidatePath("/koperasi/dashboard");
-  revalidatePath("/wali/dashboard");
+    revalidatePath("/koperasi/dashboard");
+    revalidatePath("/wali/dashboard");
 
-  return {
-    success: true,
-    message: `Transaksi belanja ${siswa.name} sebesar ${totalBelanjaFormat} berhasil diproses.`,
-    transaksi,
-    sisaSaldo,
-    sisaLimit,
-  };
+    return {
+      success: true,
+      message: `Transaksi belanja ${siswa.name} sebesar ${totalBelanjaFormat} berhasil diproses.`,
+      transaksi,
+      sisaSaldo: newSaldo,
+      sisaLimit,
+    };
+  });
 }
 
 // ========== QUERIES RIWAYAT UANG SAKU & TOPUP ==========
@@ -362,6 +366,19 @@ export async function getRiwayatUangSaku(siswaId: string) {
   const session = await getServerSession(authOptions);
   if (!session) {
     throw new Error("Tidak terautentikasi.");
+  }
+
+  // Jika role Wali, pastikan siswaId adalah anaknya
+  if (session.user.role === "WALIMURID") {
+    const isChild = await prisma.siswa.findFirst({
+      where: {
+        id: siswaId,
+        wali: { userId: session.user.id },
+      },
+    });
+    if (!isChild) {
+      throw new Error("Akses ditolak. Anda tidak memiliki akses ke riwayat siswa ini.");
+    }
   }
 
   const [topupList, belanjaList] = await Promise.all([

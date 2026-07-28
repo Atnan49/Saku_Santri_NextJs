@@ -34,21 +34,13 @@ import {
   CartesianGrid,
 } from "recharts";
 
-const chartData = [
-  { bulan: "Jul", penerimaan: 0, tunggakan: 0 },
-  { bulan: "Agu", penerimaan: 0, tunggakan: 0 },
-  { bulan: "Sep", penerimaan: 0, tunggakan: 0 },
-  { bulan: "Okt", penerimaan: 0, tunggakan: 0 },
-  { bulan: "Nov", penerimaan: 0, tunggakan: 0 },
-  { bulan: "Des", penerimaan: 0, tunggakan: 0 },
-];
-
 export default function AdminDashboardPage() {
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({
+  const [stats, setStats] = useState<any>({
     totalSiswa: 0,
     pendingVerification: 0,
     totalTagihanBulanIni: 0,
+    chartData: [],
   });
 
   useEffect(() => {
@@ -98,51 +90,42 @@ export default function AdminDashboardPage() {
                     <div style={{ fontSize: "1.8rem", fontWeight: 800, color: "var(--text-main)" }}>
                       {stats.totalSiswa} <span style={{ fontSize: "0.9rem", fontWeight: 600, color: "var(--text-muted)" }}>Santri</span>
                     </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.3rem", fontSize: "0.75rem", color: "var(--status-lunas)" }}>
-                      <ArrowUpRight size={14} /> Terdaftar di Sistem Buku Besar
-                    </div>
                   </GlassCard>
 
-                  {/* Card 2: Menunggu Verifikasi */}
+                  {/* Card 2: Perlu Verifikasi Admin */}
                   <GlassCard className="interactive" style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <span style={{ fontSize: "0.78rem", fontWeight: 800, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                        Menunggu Verifikasi Admin
+                        Verifikasi Antrean Admin
                       </span>
                       <div style={{ padding: "0.5rem", borderRadius: "10px", backgroundColor: "var(--status-menunggu-bg)", color: "var(--status-menunggu)" }}>
                         <Clock size={20} />
                       </div>
                     </div>
                     <div style={{ fontSize: "1.8rem", fontWeight: 800, color: "var(--text-main)" }}>
-                      {stats.pendingVerification} <span style={{ fontSize: "0.9rem", fontWeight: 600, color: "var(--text-muted)" }}>Berkas</span>
-                    </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.3rem", fontSize: "0.75rem", color: "var(--status-menunggu)" }}>
-                      Perlu Tindakan Admin TU
+                      {stats.pendingVerification} <span style={{ fontSize: "0.9rem", fontWeight: 600, color: "var(--text-muted)" }}>Setoran</span>
                     </div>
                   </GlassCard>
 
-                  {/* Card 3: Total Tagihan Bulan Ini */}
+                  {/* Card 3: Tagihan Diterbitkan Bulan Ini */}
                   <GlassCard className="interactive" style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <span style={{ fontSize: "0.78rem", fontWeight: 800, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                        Tagihan Terbit Bulan Ini
+                        Tagihan Diterbitkan Bulan Ini
                       </span>
                       <div style={{ padding: "0.5rem", borderRadius: "10px", backgroundColor: "var(--primary-light)", color: "var(--primary)" }}>
                         <CreditCard size={20} />
                       </div>
                     </div>
-                    <div style={{ fontSize: "1.6rem", fontWeight: 800, color: "var(--text-main)" }}>
+                    <div style={{ fontSize: "1.6rem", fontWeight: 800, color: "var(--primary)" }}>
                       {formatIDR(stats.totalTagihanBulanIni)}
-                    </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.3rem", fontSize: "0.75rem", color: "var(--text-muted)" }}>
-                      Bulan Berjalan 2026
                     </div>
                   </GlassCard>
                 </div>
               </section>
 
-              {/* SECTION 2: Analytics Chart Recharts */}
-              <section>
+              {/* SECTION 2: Chart & Financial Overview */}
+              <section style={{ display: "grid", gridTemplateColumns: "1fr", gap: "1.5rem" }}>
                 <div className="glass-card" style={{ display: "flex", flexDirection: "column", gap: "1.25rem", padding: "1.5rem" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
@@ -168,7 +151,7 @@ export default function AdminDashboardPage() {
 
                   <div style={{ width: "100%", height: 280 }}>
                     <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                      <AreaChart data={stats.chartData || []} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                         <defs>
                           <linearGradient id="colorPenerimaan" x1="0" y1="0" x2="0" y2="1">
                             <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.4} />

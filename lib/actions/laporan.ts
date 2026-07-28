@@ -13,26 +13,66 @@ import * as utilsXlsx from "xlsx";
 
 // ========== ADMIN DASHBOARD STATS ==========
 
+// ========== ADMIN DASHBOARD STATS ==========
+
 export async function getAdminDashboardStats() {
   const session = await getServerSession(authOptions);
   if (!session || session.user.role !== "ADMIN") {
     throw new Error("Akses ditolak.");
   }
 
-  const [totalSiswa, pendingVerification, currentMonthBills] = await Promise.all([
-    prisma.siswa.count(),
-    prisma.tagihan.count({
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  const [totalSiswa, pendingVerification, currentMonthBills, monthlyChartRaw] = await Promise.all([
+    (prisma as any).siswa.count({ where: { status: "AKTIF" } }),
+    (prisma as any).tagihan.count({
       where: { status: "MENUNGGU_VERIFIKASI_ADMIN" },
     }),
-    prisma.tagihan.aggregate({
+    (prisma as any).tagihan.aggregate({
       _sum: { nominalAkhir: true },
       where: {
+        createdAt: { gte: startOfMonth },
+      },
+    }),
+    // Aggregasi 6 bulan terakhir untuk chart area
+    (prisma as any).tagihan.findMany({
+      where: {
         createdAt: {
-          gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+          gte: new Date(now.getFullYear(), now.getMonth() - 5, 1),
         },
+      },
+      select: {
+        createdAt: true,
+        nominalAkhir: true,
+        nominalTerbayar: true,
+        status: true,
       },
     }),
   ]);
+
+  // Grouping per bulan untuk Chart (6 bulan terakhir)
+  const monthNames = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
+  const monthlyChartMap = new Map<string, { bulan: string; penerimaan: number; tunggakan: number }>();
+
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const key = `${d.getFullYear()}-${d.getMonth()}`;
+    const label = `${monthNames[d.getMonth()]}`;
+    monthlyChartMap.set(key, { bulan: label, penerimaan: 0, tunggakan: 0 });
+  }
+
+  for (const bill of monthlyChartRaw) {
+    const d = new Date(bill.createdAt);
+    const key = `${d.getFullYear()}-${d.getMonth()}`;
+    if (monthlyChartMap.has(key)) {
+      const entry = monthlyChartMap.get(key)!;
+      const terbayar = Number(bill.nominalTerbayar || 0);
+      const sisa = Math.max(0, Number(bill.nominalAkhir) - terbayar);
+      entry.penerimaan += terbayar;
+      entry.tunggakan += sisa;
+    }
+  }
 
   return {
     totalSiswa,
@@ -40,6 +80,7 @@ export async function getAdminDashboardStats() {
     totalTagihanBulanIni: currentMonthBills._sum.nominalAkhir
       ? Number(currentMonthBills._sum.nominalAkhir)
       : 0,
+    chartData: Array.from(monthlyChartMap.values()),
   };
 }
 
@@ -53,45 +94,50 @@ export async function getBendaharaDashboardStats() {
 
   const [totalLunas, totalTunggakan, pendingApproval, classTunggakanRaw] =
     await Promise.all([
-      // Total dana diterima (LUNAS)
-      prisma.tagihan.aggregate({
-        _sum: { nominalAkhir: true },
-        where: { status: "LUNAS" },
+      // Total dana diterima (nominalTerbayar)
+      (prisma as any).tagihan.aggregate({
+        _sum: { nominalTerbayar: true },
       }),
 
-      // Total tunggakan (BELUM_BAYAR + DITOLAK)
-      prisma.tagihan.aggregate({
-        _sum: { nominalAkhir: true },
+      // Total tunggakan (nominalAkhir - nominalTerbayar) untuk status non-LUNAS
+      (prisma as any).tagihan.findMany({
         where: {
-          status: { in: ["BELUM_BAYAR", "DITOLAK_ADMIN", "DITOLAK_BENDAHARA"] },
+          status: { notIn: ["LUNAS"] },
         },
+        select: { nominalAkhir: true, nominalTerbayar: true },
       }),
 
       // Total transaksi menunggu approval final
-      prisma.tagihan.count({
+      (prisma as any).tagihan.count({
         where: { status: "MENUNGGU_APPROVAL_BENDAHARA" },
       }),
 
       // Agregasi tunggakan per kelas
-      prisma.siswa.findMany({
+      (prisma as any).siswa.findMany({
+        where: { status: "AKTIF" },
         select: {
           kelas: { select: { name: true } },
           tagihan: {
             where: {
-              status: { in: ["BELUM_BAYAR", "DITOLAK_ADMIN", "DITOLAK_BENDAHARA"] },
+              status: { notIn: ["LUNAS"] },
             },
-            select: { nominalAkhir: true },
+            select: { nominalAkhir: true, nominalTerbayar: true },
           },
         },
       }),
     ]);
 
+  const totalTunggakanSum = totalTunggakan.reduce((sum: number, t: any) => {
+    return sum + Math.max(0, Number(t.nominalAkhir) - Number(t.nominalTerbayar));
+  }, 0);
+
   // Aggregate tunggakan per nama kelas
   const tunggakanPerKelas: Record<string, number> = {};
-  for (const item of classTunggakanRaw) {
+  for (const item of (classTunggakanRaw as any[])) {
     const kelasName = item.kelas.name;
     const studentTunggakan = item.tagihan.reduce(
-      (sum: number, b: { nominalAkhir: any }) => sum + Number(b.nominalAkhir),
+      (sum: number, b: { nominalAkhir: any; nominalTerbayar: any }) =>
+        sum + Math.max(0, Number(b.nominalAkhir) - Number(b.nominalTerbayar)),
       0
     );
     tunggakanPerKelas[kelasName] =
@@ -99,12 +145,10 @@ export async function getBendaharaDashboardStats() {
   }
 
   return {
-    totalDanaDiterima: totalLunas._sum.nominalAkhir
-      ? Number(totalLunas._sum.nominalAkhir)
+    totalDanaDiterima: totalLunas._sum.nominalTerbayar
+      ? Number(totalLunas._sum.nominalTerbayar)
       : 0,
-    totalTunggakan: totalTunggakan._sum.nominalAkhir
-      ? Number(totalTunggakan._sum.nominalAkhir)
-      : 0,
+    totalTunggakan: totalTunggakanSum,
     pendingApproval,
     tunggakanPerKelas,
   };
@@ -120,7 +164,7 @@ export async function getWaliDashboardData() {
 
   const waliUserId = session.user.id;
 
-  const wali = await prisma.waliMurid.findUnique({
+  const wali = await (prisma as any).waliMurid.findUnique({
     where: { userId: waliUserId },
     include: {
       user: { select: { name: true, phone: true } },
@@ -130,7 +174,9 @@ export async function getWaliDashboardData() {
           tagihan: {
             include: {
               jenisTagihan: { select: { name: true } },
-              pembayaran: true,
+              pembayaran: {
+                orderBy: { createdAt: "desc" },
+              },
             },
             orderBy: { dueDate: "desc" },
           },
@@ -162,14 +208,14 @@ export async function generateExcelReportBuffer(filters?: {
   const where: any = {};
 
   if (filters?.status) where.status = filters.status;
-  if (filters?.kelasId) where.siswa = { kelasId: filters.kelasId };
+  if (filters?.kelasId && filters.kelasId !== "SEMUA") where.siswa = { kelasId: filters.kelasId };
   if (filters?.startDate || filters?.endDate) {
     where.createdAt = {};
     if (filters.startDate) where.createdAt.gte = new Date(filters.startDate);
     if (filters.endDate) where.createdAt.lte = new Date(filters.endDate);
   }
 
-  const tagihanList = await prisma.tagihan.findMany({
+  const tagihanList = await (prisma as any).tagihan.findMany({
     where,
     include: {
       siswa: {
@@ -184,31 +230,38 @@ export async function generateExcelReportBuffer(filters?: {
       },
       jenisTagihan: { select: { name: true } },
       tahunAjaran: { select: { year: true } },
-      pembayaran: true,
+      pembayaran: { orderBy: { createdAt: "desc" }, take: 1 },
     },
     orderBy: { createdAt: "desc" },
   });
 
   // Map ke format row Excel
-  const rows = tagihanList.map((t: any, index: number) => ({
-    No: index + 1,
-    "Nama Santri": t.siswa.name,
-    NISN: t.siswa.nisn,
-    Kelas: t.siswa.kelas.name,
-    "Wali Murid": t.siswa.wali.user.name,
-    "No HP Wali": t.siswa.wali.user.phone || "-",
-    "Jenis Tagihan": t.jenisTagihan.name,
-    Periode: t.period || "-",
-    "Tahun Ajaran": t.tahunAjaran.year,
-    "Nominal Awal": Number(t.nominalAwal),
-    "Potongan Beasiswa": Number(t.potongan),
-    "Nominal Wajib Bayar": Number(t.nominalAkhir),
-    "Jatuh Tempo": t.dueDate.toISOString().split("T")[0],
-    Status: t.status,
-    "Tanggal Pembayaran": t.pembayaran?.approvedAt
-      ? t.pembayaran.approvedAt.toISOString().split("T")[0]
-      : "-",
-  }));
+  const rows = tagihanList.map((t: any, index: number) => {
+    const nominalAkhir = Number(t.nominalAkhir);
+    const nominalTerbayar = Number(t.nominalTerbayar || 0);
+    const sisa = Math.max(0, nominalAkhir - nominalTerbayar);
+    const latestPayment = t.pembayaran?.[0];
+
+    return {
+      No: index + 1,
+      "Nama Santri": t.siswa.name,
+      NISN: t.siswa.nisn,
+      Kelas: t.siswa.kelas.name,
+      "Wali Murid": t.siswa.wali.user.name,
+      "No HP Wali": t.siswa.wali.user.phone || "-",
+      "Jenis Tagihan": t.jenisTagihan.name,
+      Periode: t.period || "-",
+      "Tahun Ajaran": t.tahunAjaran.year,
+      "Nominal Tagihan": nominalAkhir,
+      "Telah Terbayar": nominalTerbayar,
+      "Sisa Tagihan": sisa,
+      "Jatuh Tempo": t.dueDate.toISOString().split("T")[0],
+      Status: t.status,
+      "Setoran Terakhir": latestPayment?.approvedAt
+        ? latestPayment.approvedAt.toISOString().split("T")[0]
+        : "-",
+    };
+  });
 
   // Buat worksheet dan workbook dengan xlsx
   const worksheet = utilsXlsx.utils.json_to_sheet(rows);

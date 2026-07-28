@@ -14,16 +14,14 @@ import { revalidatePath } from "next/cache";
 
 // ========== READ ==========
 
-export async function getNotifications(userId?: string) {
+export async function getNotifications() {
   const session = await getServerSession(authOptions);
   if (!session) {
     throw new Error("Tidak terautentikasi.");
   }
 
-  const targetUserId = userId || session.user.id;
-
   const notifications = await prisma.notification.findMany({
-    where: { userId: targetUserId },
+    where: { userId: session.user.id },
     orderBy: { createdAt: "desc" },
     take: 50,
   });
@@ -53,8 +51,11 @@ export async function markAsRead(notifId: string) {
     throw new Error("Tidak terautentikasi.");
   }
 
-  await prisma.notification.update({
-    where: { id: notifId },
+  await prisma.notification.updateMany({
+    where: {
+      id: notifId,
+      userId: session.user.id,
+    },
     data: { isRead: true },
   });
 

@@ -10,7 +10,8 @@ import SegmentedControl from "@/components/ui/SegmentedControl";
 import { formatIDR, formatDateIndonesian } from "@/lib/utils";
 import { getWaliDashboardData } from "@/lib/actions/laporan";
 import { submitPaymentProof } from "@/lib/actions/pembayaran";
-import { submitTopupSaku } from "@/lib/actions/uang-saku";
+import { submitTopupSaku, updateLimitHarian } from "@/lib/actions/uang-saku";
+import { getInstitutionSettings } from "@/lib/actions/settings";
 import {
   Users,
   Printer,
@@ -29,7 +30,6 @@ import {
   ShoppingBag,
   CreditCard,
 } from "lucide-react";
-import { updateLimitHarian } from "@/lib/actions/uang-saku";
 
 interface TagihanItem {
   id: string;
@@ -37,6 +37,7 @@ interface TagihanItem {
   anak: string;
   keterangan: string;
   nominal: number;
+  nominalTerbayar: number;
   status: string;
   dueDate: string;
 }
@@ -44,6 +45,7 @@ interface TagihanItem {
 export default function WaliDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [waliData, setWaliData] = useState<any>(null);
+  const [bankSettings, setBankSettings] = useState<any>(null);
   const [transactionType, setTransactionType] = useState<"TAGIHAN" | "TOPUP">("TAGIHAN");
   const [selectedSiswaId, setSelectedSiswaId] = useState<string>("");
   const [topupNominal, setTopupNominal] = useState<string>("");
@@ -99,22 +101,27 @@ export default function WaliDashboardPage() {
   useEffect(() => {
     async function loadData() {
       try {
-        const wali = await getWaliDashboardData();
+        const [wali, settings]: [any, any] = await Promise.all([
+          getWaliDashboardData(),
+          getInstitutionSettings(),
+        ]);
         setWaliData(wali);
+        setBankSettings(settings);
 
-        if (wali.siswa && wali.siswa.length > 0) {
+        if (wali && wali.siswa && wali.siswa.length > 0) {
           setSelectedSiswaId(wali.siswa[0].id);
         }
 
         const allBills: TagihanItem[] = [];
-        (wali.siswa || []).forEach((student: any) => {
+        (wali?.siswa || []).forEach((student: any) => {
           (student.tagihan || []).forEach((bill: any) => {
             allBills.push({
               id: bill.id,
-              periode: bill.period || "Nov 2023",
+              periode: bill.period || "Tagihan Santri",
               anak: student.name,
               keterangan: bill.jenisTagihan?.name || "Tagihan Sekolah",
               nominal: Number(bill.nominalAkhir || 0),
+              nominalTerbayar: Number(bill.nominalTerbayar || 0),
               status: bill.status,
               dueDate: bill.dueDate,
             });
@@ -661,9 +668,13 @@ export default function WaliDashboardPage() {
                     <h3 style={{ fontSize: "1.05rem", fontWeight: 800, color: "var(--text-main)" }}>
                       Informasi Rekening Institusi
                     </h3>
+                    <div style={{ fontSize: "0.78rem", color: "var(--text-muted)", marginTop: "0.15rem" }}>
+                      {bankSettings?.INSTITUTION_NAME || "Pesantren Digital Saku Santri"}
+                    </div>
                   </div>
 
                   <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
+                    {/* Bank 1 */}
                     <div
                       style={{
                         backgroundColor: "rgba(255, 255, 255, 0.02)",
@@ -680,24 +691,24 @@ export default function WaliDashboardPage() {
                         <Building2 size={24} style={{ color: "var(--primary)", flexShrink: 0 }} />
                         <div>
                           <div style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.05em", color: "var(--text-muted)" }}>
-                            BANK SYARIAH INDONESIA (BSI)
+                            {bankSettings?.BANK_NAME_1 || "BANK SYARIAH INDONESIA (BSI)"}
                           </div>
                           <div style={{ fontSize: "1.25rem", fontWeight: 800, letterSpacing: "0.08em", color: "var(--text-main)" }}>
-                            7182 9910 22
+                            {bankSettings?.BANK_ACC_1 || "7182 9910 22"}
                           </div>
                           <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
-                            a.n. Yayasan Pendidikan Digital
+                            {bankSettings?.BANK_HOLDER_1 || "a.n. Yayasan Pendidikan Digital"}
                           </div>
                         </div>
                       </div>
                       <button
-                        onClick={() => handleCopyBank("7182991022", "BSI")}
+                        onClick={() => handleCopyBank(bankSettings?.BANK_ACC_1 || "7182991022", "BANK1")}
                         style={{
                           padding: "0.4rem 0.75rem",
                           fontSize: "0.75rem",
                           fontWeight: 700,
-                          backgroundColor: copiedBank === "BSI" ? "var(--status-lunas-bg)" : "transparent",
-                          color: copiedBank === "BSI" ? "var(--status-lunas)" : "var(--text-main)",
+                          backgroundColor: copiedBank === "BANK1" ? "var(--status-lunas-bg)" : "transparent",
+                          color: copiedBank === "BANK1" ? "var(--status-lunas)" : "var(--text-main)",
                           border: "1px solid var(--border-glass)",
                           borderRadius: "6px",
                           cursor: "pointer",
@@ -707,7 +718,7 @@ export default function WaliDashboardPage() {
                           flexShrink: 0,
                         }}
                       >
-                        {copiedBank === "BSI" ? (
+                        {copiedBank === "BANK1" ? (
                           <>
                             <Check size={14} /> Tersalin!
                           </>
@@ -719,6 +730,7 @@ export default function WaliDashboardPage() {
                       </button>
                     </div>
 
+                    {/* Bank 2 */}
                     <div
                       style={{
                         backgroundColor: "rgba(255, 255, 255, 0.02)",
@@ -735,24 +747,24 @@ export default function WaliDashboardPage() {
                         <Building2 size={24} style={{ color: "var(--primary)", flexShrink: 0 }} />
                         <div>
                           <div style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.05em", color: "var(--text-muted)" }}>
-                            BANK MANDIRI
+                            {bankSettings?.BANK_NAME_2 || "BANK MANDIRI"}
                           </div>
                           <div style={{ fontSize: "1.25rem", fontWeight: 800, letterSpacing: "0.08em", color: "var(--text-main)" }}>
-                            131 00 2938 1192
+                            {bankSettings?.BANK_ACC_2 || "131 00 2938 1192"}
                           </div>
                           <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
-                            a.n. Yayasan Pendidikan Digital
+                            {bankSettings?.BANK_HOLDER_2 || "a.n. Yayasan Pendidikan Digital"}
                           </div>
                         </div>
                       </div>
                       <button
-                        onClick={() => handleCopyBank("1310029381192", "MANDIRI")}
+                        onClick={() => handleCopyBank(bankSettings?.BANK_ACC_2 || "1310029381192", "BANK2")}
                         style={{
                           padding: "0.4rem 0.75rem",
                           fontSize: "0.75rem",
                           fontWeight: 700,
-                          backgroundColor: copiedBank === "MANDIRI" ? "var(--status-lunas-bg)" : "transparent",
-                          color: copiedBank === "MANDIRI" ? "var(--status-lunas)" : "var(--text-main)",
+                          backgroundColor: copiedBank === "BANK2" ? "var(--status-lunas-bg)" : "transparent",
+                          color: copiedBank === "BANK2" ? "var(--status-lunas)" : "var(--text-main)",
                           border: "1px solid var(--border-glass)",
                           borderRadius: "6px",
                           cursor: "pointer",
@@ -762,7 +774,7 @@ export default function WaliDashboardPage() {
                           flexShrink: 0,
                         }}
                       >
-                        {copiedBank === "MANDIRI" ? (
+                        {copiedBank === "BANK2" ? (
                           <>
                             <Check size={14} /> Tersalin!
                           </>
@@ -789,7 +801,7 @@ export default function WaliDashboardPage() {
                   >
                     <AlertCircle size={16} style={{ color: "var(--status-menunggu)", flexShrink: 0, marginTop: "2px" }} />
                     <span>
-                      Pastikan nominal transfer tepat sesuai tagihan untuk mempercepat proses verifikasi admin.
+                      {bankSettings?.PAYMENT_NOTE || "Pastikan nominal transfer tepat sesuai tagihan untuk mempercepat proses verifikasi admin."}
                     </span>
                   </div>
                 </div>
