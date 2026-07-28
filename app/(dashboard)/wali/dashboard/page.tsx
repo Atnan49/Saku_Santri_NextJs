@@ -23,7 +23,13 @@ import {
   Wallet,
   Receipt,
   CheckCircle2,
+  Copy,
+  Check,
+  SlidersHorizontal,
+  ShoppingBag,
+  CreditCard,
 } from "lucide-react";
+import { updateLimitHarian } from "@/lib/actions/uang-saku";
 
 interface TagihanItem {
   id: string;
@@ -51,6 +57,42 @@ export default function WaliDashboardPage() {
 
   const [receiptModalOpen, setReceiptModalOpen] = useState(false);
   const [selectedReceipt, setSelectedReceipt] = useState<DigitalReceiptData | null>(null);
+
+  const [copiedBank, setCopiedBank] = useState<string | null>(null);
+  const [limitModalOpen, setLimitModalOpen] = useState(false);
+  const [selectedLimitSiswa, setSelectedLimitSiswa] = useState<any>(null);
+  const [newLimitValue, setNewLimitValue] = useState("");
+  const [isUpdatingLimit, setIsUpdatingLimit] = useState(false);
+
+  const handleCopyBank = (noRek: string, bankName: string) => {
+    navigator.clipboard.writeText(noRek.replace(/\s+/g, ""));
+    setCopiedBank(bankName);
+    setTimeout(() => setCopiedBank(null), 2000);
+  };
+
+  const handleOpenLimitModal = (siswa: any) => {
+    setSelectedLimitSiswa(siswa);
+    setNewLimitValue(String(Number(siswa.limitHarian) || 20000));
+    setLimitModalOpen(true);
+  };
+
+  const handleSaveLimit = async () => {
+    if (!selectedLimitSiswa || !newLimitValue) return;
+    setIsUpdatingLimit(true);
+    try {
+      await updateLimitHarian({
+        siswaId: selectedLimitSiswa.id,
+        limitHarian: Number(newLimitValue),
+      });
+      alert(`Limit jajan harian ${selectedLimitSiswa.name} berhasil diperbarui!`);
+      setLimitModalOpen(false);
+      window.location.reload();
+    } catch (err: any) {
+      alert(err.message || "Gagal memperbarui limit saku.");
+    } finally {
+      setIsUpdatingLimit(false);
+    }
+  };
 
   const [tagihanList, setTagihanList] = useState<Array<TagihanItem>>([]);
 
@@ -243,26 +285,45 @@ export default function WaliDashboardPage() {
                             </span>
                           </div>
 
-                          <div style={{ borderTop: "1px solid var(--border-glass)", paddingTop: "0.85rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <div style={{ borderTop: "1px solid var(--border-glass)", paddingTop: "0.85rem", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
                             <div>
-                              <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>Total Tagihan Berjalan</div>
-                              <div style={{ fontSize: "1.15rem", fontWeight: 800, color: studentUnpaid > 0 ? "var(--status-ditolak)" : "var(--text-main)" }}>
+                              <div style={{ fontSize: "0.72rem", color: "var(--text-muted)", textTransform: "uppercase" }}>Tagihan Berjalan</div>
+                              <div style={{ fontSize: "1.05rem", fontWeight: 800, color: studentUnpaid > 0 ? "var(--status-ditolak)" : "var(--text-main)", marginTop: "0.1rem" }}>
                                 {formatIDR(studentUnpaid)}
                               </div>
                             </div>
+                            <div>
+                              <div style={{ fontSize: "0.72rem", color: "var(--text-muted)", textTransform: "uppercase" }}>Saldo Uang Saku</div>
+                              <div style={{ fontSize: "1.05rem", fontWeight: 800, color: "var(--primary)", marginTop: "0.1rem" }}>
+                                {formatIDR(Number(student.saldoSaku) || 0)}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div style={{ backgroundColor: "rgba(255, 255, 255, 0.03)", border: "1px solid var(--border-glass)", borderRadius: "6px", padding: "0.6rem 0.85rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                            <div>
+                              <div style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>Limit Jajan Harian</div>
+                              <div style={{ fontSize: "0.85rem", fontWeight: 800, color: "var(--text-main)" }}>
+                                {formatIDR(Number(student.limitHarian) || 20000)} / hari
+                              </div>
+                            </div>
                             <button
+                              onClick={() => handleOpenLimitModal(student)}
                               style={{
-                                padding: "0.45rem 1rem",
-                                fontSize: "0.8rem",
+                                padding: "0.35rem 0.75rem",
+                                fontSize: "0.75rem",
                                 fontWeight: 700,
                                 backgroundColor: "transparent",
-                                color: "var(--text-main)",
-                                border: "1px solid var(--border-glass)",
-                                borderRadius: "6px",
+                                color: "var(--primary)",
+                                border: "1px solid var(--primary)",
+                                borderRadius: "4px",
                                 cursor: "pointer",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "0.3rem",
                               }}
                             >
-                              Rincian
+                              <SlidersHorizontal size={13} /> Atur Limit
                             </button>
                           </div>
                         </div>
@@ -611,21 +672,51 @@ export default function WaliDashboardPage() {
                         padding: "1rem",
                         display: "flex",
                         alignItems: "center",
+                        justifyContent: "space-between",
                         gap: "1rem",
                       }}
                     >
-                      <Building2 size={24} style={{ color: "var(--primary)", flexShrink: 0 }} />
-                      <div>
-                        <div style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.05em", color: "var(--text-muted)" }}>
-                          BANK SYARIAH INDONESIA (BSI)
-                        </div>
-                        <div style={{ fontSize: "1.25rem", fontWeight: 800, letterSpacing: "0.08em", color: "var(--text-main)" }}>
-                          7182 9910 22
-                        </div>
-                        <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
-                          a.n. Yayasan Pendidikan Digital
+                      <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+                        <Building2 size={24} style={{ color: "var(--primary)", flexShrink: 0 }} />
+                        <div>
+                          <div style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.05em", color: "var(--text-muted)" }}>
+                            BANK SYARIAH INDONESIA (BSI)
+                          </div>
+                          <div style={{ fontSize: "1.25rem", fontWeight: 800, letterSpacing: "0.08em", color: "var(--text-main)" }}>
+                            7182 9910 22
+                          </div>
+                          <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
+                            a.n. Yayasan Pendidikan Digital
+                          </div>
                         </div>
                       </div>
+                      <button
+                        onClick={() => handleCopyBank("7182991022", "BSI")}
+                        style={{
+                          padding: "0.4rem 0.75rem",
+                          fontSize: "0.75rem",
+                          fontWeight: 700,
+                          backgroundColor: copiedBank === "BSI" ? "var(--status-lunas-bg)" : "transparent",
+                          color: copiedBank === "BSI" ? "var(--status-lunas)" : "var(--text-main)",
+                          border: "1px solid var(--border-glass)",
+                          borderRadius: "6px",
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "0.35rem",
+                          flexShrink: 0,
+                        }}
+                      >
+                        {copiedBank === "BSI" ? (
+                          <>
+                            <Check size={14} /> Tersalin!
+                          </>
+                        ) : (
+                          <>
+                            <Copy size={14} /> Salin
+                          </>
+                        )}
+                      </button>
                     </div>
 
                     <div
@@ -636,21 +727,51 @@ export default function WaliDashboardPage() {
                         padding: "1rem",
                         display: "flex",
                         alignItems: "center",
+                        justifyContent: "space-between",
                         gap: "1rem",
                       }}
                     >
-                      <Building2 size={24} style={{ color: "var(--primary)", flexShrink: 0 }} />
-                      <div>
-                        <div style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.05em", color: "var(--text-muted)" }}>
-                          BANK MANDIRI
-                        </div>
-                        <div style={{ fontSize: "1.25rem", fontWeight: 800, letterSpacing: "0.08em", color: "var(--text-main)" }}>
-                          131 00 2938 1192
-                        </div>
-                        <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
-                          a.n. Yayasan Pendidikan Digital
+                      <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+                        <Building2 size={24} style={{ color: "var(--primary)", flexShrink: 0 }} />
+                        <div>
+                          <div style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.05em", color: "var(--text-muted)" }}>
+                            BANK MANDIRI
+                          </div>
+                          <div style={{ fontSize: "1.25rem", fontWeight: 800, letterSpacing: "0.08em", color: "var(--text-main)" }}>
+                            131 00 2938 1192
+                          </div>
+                          <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
+                            a.n. Yayasan Pendidikan Digital
+                          </div>
                         </div>
                       </div>
+                      <button
+                        onClick={() => handleCopyBank("1310029381192", "MANDIRI")}
+                        style={{
+                          padding: "0.4rem 0.75rem",
+                          fontSize: "0.75rem",
+                          fontWeight: 700,
+                          backgroundColor: copiedBank === "MANDIRI" ? "var(--status-lunas-bg)" : "transparent",
+                          color: copiedBank === "MANDIRI" ? "var(--status-lunas)" : "var(--text-main)",
+                          border: "1px solid var(--border-glass)",
+                          borderRadius: "6px",
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "0.35rem",
+                          flexShrink: 0,
+                        }}
+                      >
+                        {copiedBank === "MANDIRI" ? (
+                          <>
+                            <Check size={14} /> Tersalin!
+                          </>
+                        ) : (
+                          <>
+                            <Copy size={14} /> Salin
+                          </>
+                        )}
+                      </button>
                     </div>
                   </div>
 
@@ -743,6 +864,92 @@ export default function WaliDashboardPage() {
           )}
         </div>
       </main>
+
+      {limitModalOpen && selectedLimitSiswa && (
+        <div className="modal-overlay" onClick={() => setLimitModalOpen(false)}>
+          <div className="glass-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: "440px", width: "100%", padding: "1.5rem" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                <SlidersHorizontal size={20} style={{ color: "var(--primary)" }} />
+                <h3 style={{ fontSize: "1.1rem", fontWeight: 800, color: "var(--text-main)" }}>
+                  Atur Limit Jajan Harian
+                </h3>
+              </div>
+              <button onClick={() => setLimitModalOpen(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-main)" }}>
+                ✕
+              </button>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+              <p style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>
+                Tentukan batas maksimal transaksi jajan di Koperasi Pesantren per hari untuk <strong>{selectedLimitSiswa.name}</strong>:
+              </p>
+
+              <div>
+                <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "var(--text-muted)", marginBottom: "0.4rem" }}>
+                  LIMIT HARIAN (RP)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="5000"
+                  style={{
+                    width: "100%",
+                    padding: "0.65rem 0.85rem",
+                    border: "1px solid var(--border-glass)",
+                    borderRadius: "8px",
+                    backgroundColor: "rgba(255, 255, 255, 0.05)",
+                    color: "var(--text-main)",
+                    fontSize: "1rem",
+                    fontWeight: 700,
+                    outline: "none",
+                  }}
+                  value={newLimitValue}
+                  onChange={(e) => setNewLimitValue(e.target.value)}
+                />
+              </div>
+
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem", marginTop: "0.5rem" }}>
+                <button
+                  style={{
+                    padding: "0.6rem 1.25rem",
+                    fontSize: "0.85rem",
+                    fontWeight: 700,
+                    backgroundColor: "transparent",
+                    color: "var(--text-main)",
+                    border: "1px solid var(--border-glass)",
+                    borderRadius: "8px",
+                    cursor: "pointer",
+                  }}
+                  onClick={() => setLimitModalOpen(false)}
+                >
+                  Batal
+                </button>
+                <button
+                  disabled={isUpdatingLimit}
+                  style={{
+                    padding: "0.6rem 1.25rem",
+                    fontSize: "0.85rem",
+                    fontWeight: 700,
+                    backgroundColor: "var(--primary)",
+                    color: "#FFF",
+                    border: "none",
+                    borderRadius: "8px",
+                    cursor: isUpdatingLimit ? "not-allowed" : "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.4rem",
+                  }}
+                  onClick={handleSaveLimit}
+                >
+                  {isUpdatingLimit ? <Loader2 className="animate-spin" size={16} /> : null}
+                  <span>SIMPAN LIMIT</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <DigitalReceiptModal
         isOpen={receiptModalOpen}

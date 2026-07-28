@@ -97,14 +97,32 @@ export default function AdminPengaturanPage() {
     loadData();
   }, []);
 
-  const handleResetPassword = async (userId: string, waliName: string) => {
-    const newPass = prompt(`Masukkan password baru untuk Wali ${waliName} (minimal 6 karakter):`, "wali123");
-    if (!newPass) return;
+  const [resetModalOpen, setResetModalOpen] = useState(false);
+  const [selectedUserForReset, setSelectedUserForReset] = useState<{ id: string; name: string } | null>(null);
+  const [newPasswordInput, setNewPasswordInput] = useState("santri123");
+  const [isResettingPassword, setIsResettingPassword] = useState(false);
+
+  const handleOpenResetModal = (userId: string, name: string) => {
+    setSelectedUserForReset({ id: userId, name });
+    setNewPasswordInput("santri123");
+    setResetModalOpen(true);
+  };
+
+  const handleConfirmResetPassword = async () => {
+    if (!selectedUserForReset || !newPasswordInput) return;
+    if (newPasswordInput.trim().length < 6) {
+      alert("Password minimal 6 karakter.");
+      return;
+    }
+    setIsResettingPassword(true);
     try {
-      await updateUserPassword(userId, newPass);
-      alert(`Password untuk ${waliName} berhasil diubah menjadi: ${newPass}`);
+      await updateUserPassword(selectedUserForReset.id, newPasswordInput.trim());
+      alert(`Password untuk ${selectedUserForReset.name} berhasil diperbarui!`);
+      setResetModalOpen(false);
     } catch (err: any) {
       alert(err.message || "Gagal mengubah password.");
+    } finally {
+      setIsResettingPassword(false);
     }
   };
 
@@ -514,7 +532,7 @@ export default function AdminPengaturanPage() {
                           </td>
                           <td style={{ padding: "0.9rem 1rem", textAlign: "center" }}>
                             <button
-                              onClick={() => handleResetPassword(w.user.id, w.user.name)}
+                              onClick={() => handleOpenResetModal(w.user.id, w.user.name)}
                               style={{
                                 padding: "0.4rem 0.75rem",
                                 fontSize: "0.75rem",
@@ -548,6 +566,87 @@ export default function AdminPengaturanPage() {
           )}
         </div>
       </main>
+
+      {resetModalOpen && selectedUserForReset && (
+        <div className="modal-overlay" onClick={() => setResetModalOpen(false)}>
+          <div className="glass-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: "440px", width: "100%", padding: "1.5rem" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                <KeyRound size={20} style={{ color: "var(--status-menunggu)" }} />
+                <h3 style={{ fontSize: "1.1rem", fontWeight: 800, color: "var(--text-main)" }}>
+                  Reset Password Wali Murid
+                </h3>
+              </div>
+              <button onClick={() => setResetModalOpen(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-main)" }}>
+                ✕
+              </button>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+              <p style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>
+                Masukkan password baru untuk wali murid <strong>{selectedUserForReset.name}</strong>:
+              </p>
+
+              <div>
+                <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 700, color: "var(--text-muted)", marginBottom: "0.4rem" }}>
+                  PASSWORD BARU (MINIMAL 6 KARAKTER)
+                </label>
+                <input
+                  type="text"
+                  style={{
+                    width: "100%",
+                    padding: "0.65rem 0.85rem",
+                    border: "1px solid var(--border-glass)",
+                    borderRadius: "8px",
+                    backgroundColor: "rgba(255, 255, 255, 0.05)",
+                    color: "var(--text-main)",
+                    fontSize: "0.95rem",
+                    fontWeight: 700,
+                    outline: "none",
+                  }}
+                  placeholder="Contoh: santri123"
+                  value={newPasswordInput}
+                  onChange={(e) => setNewPasswordInput(e.target.value)}
+                />
+              </div>
+
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem", marginTop: "0.5rem" }}>
+                <button
+                  style={{
+                    padding: "0.6rem 1.25rem",
+                    fontSize: "0.85rem",
+                    fontWeight: 700,
+                    backgroundColor: "transparent",
+                    color: "var(--text-main)",
+                    border: "1px solid var(--border-glass)",
+                    borderRadius: "8px",
+                    cursor: "pointer",
+                  }}
+                  onClick={() => setResetModalOpen(false)}
+                >
+                  Batal
+                </button>
+                <button
+                  disabled={isResettingPassword}
+                  style={{
+                    padding: "0.6rem 1.25rem",
+                    fontSize: "0.85rem",
+                    fontWeight: 700,
+                    backgroundColor: "var(--status-menunggu)",
+                    color: "#FFF",
+                    border: "none",
+                    borderRadius: "8px",
+                    cursor: isResettingPassword ? "not-allowed" : "pointer",
+                  }}
+                  onClick={handleConfirmResetPassword}
+                >
+                  {isResettingPassword ? "MEMPROSES..." : "KONFIRMASI RESET"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

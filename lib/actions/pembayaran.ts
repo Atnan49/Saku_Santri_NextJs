@@ -366,6 +366,38 @@ export async function bendaharaApprovePayment(data: {
   };
 }
 
+export async function bendaharaApproveBulkPayments(pembayaranIds: string[]) {
+  const session = await getServerSession(authOptions);
+  if (!session || session.user.role !== "BENDAHARA") {
+    throw new Error("Akses ditolak. Hanya Bendahara yang dapat menyetujui pembayaran.");
+  }
+
+  if (!pembayaranIds || pembayaranIds.length === 0) {
+    throw new Error("Pilih minimal 1 pembayaran untuk disetujui.");
+  }
+
+  let count = 0;
+  for (const id of pembayaranIds) {
+    try {
+      await bendaharaApprovePayment({
+        pembayaranId: id,
+        action: "approve",
+        catatan: "Disetujui secara massal oleh Bendahara.",
+      });
+      count++;
+    } catch (err) {
+      console.error(`Gagal approve pembayaran ID ${id}:`, err);
+    }
+  }
+
+  revalidatePath("/bendahara/approval");
+  revalidatePath("/bendahara/dashboard");
+  revalidatePath("/admin/dashboard");
+  revalidatePath("/wali/dashboard");
+
+  return { success: true, count };
+}
+
 // ========== QUERIES untuk Halaman Verifikasi & Approval ==========
 
 export async function getPembayaranForAdminVerification() {
