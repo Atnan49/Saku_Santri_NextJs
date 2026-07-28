@@ -13,7 +13,7 @@ import GlassCard from "@/components/ui/GlassCard";
 import SegmentedControl from "@/components/ui/SegmentedControl";
 import { formatIDR } from "@/lib/utils";
 import { getTahunAjaranList, createTahunAjaran, setActiveTahunAjaran } from "@/lib/actions/tahun-ajaran";
-import { getJenisTagihanList, createJenisTagihan, updateJenisTagihan } from "@/lib/actions/jenis-tagihan";
+import { getJenisTagihanList, createJenisTagihan, updateJenisTagihan, deleteJenisTagihan } from "@/lib/actions/jenis-tagihan";
 import { getWaliMuridList, updateUserPassword } from "@/lib/actions/user";
 import { getInstitutionSettings, updateInstitutionSettings } from "@/lib/actions/settings";
 import {
@@ -30,6 +30,9 @@ import {
   Users,
   KeyRound,
   Loader2,
+  Pencil,
+  Trash2,
+  X,
 } from "lucide-react";
 
 export default function AdminPengaturanPage() {
@@ -52,6 +55,14 @@ export default function AdminPengaturanPage() {
   const [jenisType, setJenisType] = useState<"BULANAN" | "TAHUNAN" | "BEBAS">("BULANAN");
   const [jenisList, setJenisList] = useState<any[]>([]);
   const [savingJenis, setSavingJenis] = useState(false);
+
+  // Edit & Delete State Jenis Tagihan
+  const [editingJenis, setEditingJenis] = useState<any | null>(null);
+  const [editJenisNama, setEditJenisNama] = useState("");
+  const [editJenisNominal, setEditJenisNominal] = useState("");
+  const [editJenisType, setEditJenisType] = useState<"BULANAN" | "TAHUNAN" | "BEBAS">("BULANAN");
+  const [updatingJenis, setUpdatingJenis] = useState(false);
+  const [deletingJenisId, setDeletingJenisId] = useState<string | null>(null);
 
   // Form State Rekening Bank & Institusi
   const [instName, setInstName] = useState("Pesantren Digital Saku Santri");
@@ -220,6 +231,45 @@ export default function AdminPengaturanPage() {
       alert(err.message || "Gagal menambah jenis tagihan.");
     } finally {
       setSavingJenis(false);
+    }
+  };
+
+  const handleStartEditJenis = (j: any) => {
+    setEditingJenis(j);
+    setEditJenisNama(j.name);
+    setEditJenisNominal(String(j.nominal));
+    setEditJenisType(j.type);
+  };
+
+  const handleUpdateJenis = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingJenis || !editJenisNama || !editJenisNominal) return;
+    setUpdatingJenis(true);
+    try {
+      await updateJenisTagihan(editingJenis.id, {
+        name: editJenisNama.trim(),
+        type: editJenisType,
+        nominal: Number(editJenisNominal),
+      });
+      setEditingJenis(null);
+      await loadData();
+    } catch (err: any) {
+      alert(err.message || "Gagal memperbarui jenis tagihan.");
+    } finally {
+      setUpdatingJenis(false);
+    }
+  };
+
+  const handleDeleteJenis = async (id: string, name: string) => {
+    if (!confirm(`Apakah Anda yakin ingin menghapus jenis tagihan "${name}"?`)) return;
+    setDeletingJenisId(id);
+    try {
+      await deleteJenisTagihan(id);
+      await loadData();
+    } catch (err: any) {
+      alert(err.message || "Gagal menghapus jenis tagihan.");
+    } finally {
+      setDeletingJenisId(null);
     }
   };
 
@@ -433,12 +483,147 @@ export default function AdminPengaturanPage() {
                         <div style={{ fontWeight: 800, color: "var(--text-main)" }}>{j.name}</div>
                         <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>Tipe: {j.type}</div>
                       </div>
-                      <div style={{ fontWeight: 800, color: "var(--primary)" }}>
-                        Rp {Number(j.nominal).toLocaleString("id-ID")}
+                      <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+                        <div style={{ fontWeight: 800, color: "var(--primary)" }}>
+                          Rp {Number(j.nominal).toLocaleString("id-ID")}
+                        </div>
+                        <div style={{ display: "flex", gap: "0.35rem" }}>
+                          <button
+                            title="Edit Jenis Tagihan"
+                            onClick={() => handleStartEditJenis(j)}
+                            style={{
+                              padding: "0.35rem 0.6rem",
+                              backgroundColor: "var(--bg-surface-low)",
+                              color: "var(--primary)",
+                              border: "1px solid var(--border-glass)",
+                              borderRadius: "4px",
+                              cursor: "pointer",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "0.25rem",
+                              fontSize: "0.75rem",
+                              fontWeight: 700,
+                            }}
+                          >
+                            <Pencil size={14} /> Edit
+                          </button>
+                          <button
+                            title="Hapus Jenis Tagihan"
+                            disabled={deletingJenisId === j.id}
+                            onClick={() => handleDeleteJenis(j.id, j.name)}
+                            style={{
+                              padding: "0.35rem 0.6rem",
+                              backgroundColor: "rgba(220, 38, 38, 0.1)",
+                              color: "var(--status-ditolak)",
+                              border: "1px solid rgba(220, 38, 38, 0.2)",
+                              borderRadius: "4px",
+                              cursor: deletingJenisId === j.id ? "not-allowed" : "pointer",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "0.25rem",
+                              fontSize: "0.75rem",
+                              fontWeight: 700,
+                            }}
+                          >
+                            {deletingJenisId === j.id ? (
+                              <Loader2 className="animate-spin" size={14} />
+                            ) : (
+                              <>
+                                <Trash2 size={14} /> Hapus
+                              </>
+                            )}
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))}
                 </div>
+              </GlassCard>
+            </div>
+          )}
+
+          {/* MODAL EDIT JENIS TAGIHAN */}
+          {editingJenis && (
+            <div style={{
+              position: "fixed",
+              inset: 0,
+              backgroundColor: "rgba(0, 0, 0, 0.5)",
+              backdropFilter: "blur(4px)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              zIndex: 999,
+              padding: "1rem"
+            }}>
+              <GlassCard style={{ width: "100%", maxWidth: "480px", padding: "1.75rem", display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--border-glass)", paddingBottom: "0.75rem" }}>
+                  <h3 style={{ fontSize: "1.1rem", fontWeight: 800, color: "var(--text-main)" }}>
+                    Edit Jenis Tagihan
+                  </h3>
+                  <button
+                    onClick={() => setEditingJenis(null)}
+                    style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer" }}
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+
+                <form onSubmit={handleUpdateJenis} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                  <div>
+                    <label style={{ fontSize: "0.75rem", fontWeight: 800, textTransform: "uppercase", color: "var(--text-muted)" }}>Nama Jenis Tagihan</label>
+                    <input
+                      type="text"
+                      required
+                      value={editJenisNama}
+                      onChange={(e) => setEditJenisNama(e.target.value)}
+                      style={{ width: "100%", padding: "0.65rem 0.85rem", border: "1px solid var(--border-glass)", borderRadius: "6px", backgroundColor: "var(--bg-app)", fontSize: "0.9rem", marginTop: "0.2rem" }}
+                    />
+                  </div>
+
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+                    <div>
+                      <label style={{ fontSize: "0.75rem", fontWeight: 800, textTransform: "uppercase", color: "var(--text-muted)" }}>Nominal Standar (Rp)</label>
+                      <input
+                        type="number"
+                        required
+                        value={editJenisNominal}
+                        onChange={(e) => setEditJenisNominal(e.target.value)}
+                        style={{ width: "100%", padding: "0.65rem 0.85rem", border: "1px solid var(--border-glass)", borderRadius: "6px", backgroundColor: "var(--bg-app)", fontSize: "0.9rem", marginTop: "0.2rem" }}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ fontSize: "0.75rem", fontWeight: 800, textTransform: "uppercase", color: "var(--text-muted)" }}>Tipe Tagihan</label>
+                      <select
+                        value={editJenisType}
+                        onChange={(e) => setEditJenisType(e.target.value as "BULANAN" | "TAHUNAN" | "BEBAS")}
+                        style={{ width: "100%", padding: "0.65rem 0.85rem", border: "1px solid var(--border-glass)", borderRadius: "6px", backgroundColor: "var(--bg-app)", fontSize: "0.9rem", marginTop: "0.2rem" }}
+                      >
+                        <option value="BULANAN">Bulanan</option>
+                        <option value="TAHUNAN">Tahunan</option>
+                        <option value="BEBAS">Bebas/Kegiatan</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem", marginTop: "0.5rem" }}>
+                    <button
+                      type="button"
+                      onClick={() => setEditingJenis(null)}
+                      style={{ padding: "0.6rem 1.25rem", border: "1px solid var(--border-glass)", borderRadius: "6px", backgroundColor: "transparent", color: "var(--text-main)", fontWeight: 700, cursor: "pointer" }}
+                    >
+                      Batal
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={updatingJenis}
+                      style={{ padding: "0.6rem 1.25rem", backgroundColor: "var(--primary)", color: "#fff", border: "none", borderRadius: "6px", fontWeight: 700, cursor: updatingJenis ? "not-allowed" : "pointer", display: "flex", alignItems: "center", gap: "0.5rem" }}
+                    >
+                      {updatingJenis ? <Loader2 className="animate-spin" size={16} /> : <Save size={16} />}
+                      Simpan Perubahan
+                    </button>
+                  </div>
+                </form>
               </GlassCard>
             </div>
           )}
