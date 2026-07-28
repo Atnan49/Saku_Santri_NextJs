@@ -65,11 +65,11 @@ export default function AdminVerifikasiPage() {
         dateTimeStr: new Date(p.createdAt).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" }),
         originalAmount: Number(p.tagihan?.nominalAwal) || 0,
         expectedAmount: Number(p.tagihan?.nominalAkhir) || 0,
-        reportedAmount: Number(p.amountPaid) || 0,
+        reportedAmount: Number(p.tagihan?.nominalAkhir) || 0,
         hasScholarship: Number(p.tagihan?.potongan) > 0,
-        paymentMethod: p.paymentMethod || "Bank Transfer",
-        proofImageUrl: p.proofUrl || "",
-        status: p.status === "VERIFIED_TU" ? "LUNAS" : p.status === "REJECTED" ? "DITOLAK" : "PENDING",
+        paymentMethod: p.catatanWali || "Bank Transfer",
+        proofImageUrl: p.buktiUrl || "",
+        status: p.tagihan?.status === "LUNAS" ? "LUNAS" : p.tagihan?.status?.includes("DITOLAK") ? "DITOLAK" : "PENDING",
       }));
       setQueueList(mapped);
       if (mapped.length > 0 && !selectedId) {
@@ -431,7 +431,8 @@ export default function AdminVerifikasiPage() {
 
                   <div
                     style={{
-                      height: "220px",
+                      minHeight: "220px",
+                      maxHeight: "320px",
                       backgroundColor: "rgba(255, 255, 255, 0.02)",
                       border: "1px dashed var(--border-glass)",
                       borderRadius: "8px",
@@ -442,18 +443,27 @@ export default function AdminVerifikasiPage() {
                       cursor: "pointer",
                       position: "relative",
                       overflow: "hidden",
+                      padding: "0.5rem",
                     }}
                     onClick={() => setFullImageModalOpen(true)}
                   >
-                    <div style={{ textAlign: "center", padding: "1.5rem" }}>
-                      <FileCheck2 size={36} style={{ color: "var(--primary)", margin: "0 auto 0.5rem" }} />
-                      <div style={{ fontSize: "0.9rem", fontWeight: 700, color: "var(--text-main)" }}>
-                        Bukti Transfer - {selectedItem.refNo}.jpg
+                    {selectedItem.proofImageUrl ? (
+                      <img
+                        src={selectedItem.proofImageUrl}
+                        alt={`Bukti Transfer ${selectedItem.refNo}`}
+                        style={{ width: "100%", maxHeight: "300px", objectFit: "contain", borderRadius: "6px" }}
+                      />
+                    ) : (
+                      <div style={{ textAlign: "center", padding: "1.5rem" }}>
+                        <FileCheck2 size={36} style={{ color: "var(--primary)", margin: "0 auto 0.5rem" }} />
+                        <div style={{ fontSize: "0.9rem", fontWeight: 700, color: "var(--text-main)" }}>
+                          Bukti Transfer - {selectedItem.refNo}
+                        </div>
+                        <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "0.2rem" }}>
+                          {selectedItem.paymentMethod} • Rp {selectedItem.reportedAmount.toLocaleString("id-ID")}
+                        </div>
                       </div>
-                      <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "0.2rem" }}>
-                        Bank BCA • Rp {selectedItem.reportedAmount.toLocaleString("id-ID")}
-                      </div>
-                    </div>
+                    )}
                   </div>
                 </div>
 
@@ -533,14 +543,22 @@ export default function AdminVerifikasiPage() {
                 <X size={20} />
               </button>
             </div>
-            <div style={{ height: "350px", backgroundColor: "rgba(255, 255, 255, 0.02)", border: "1px solid var(--border-glass)", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <div style={{ textAlign: "center" }}>
-                <FileCheck2 size={48} style={{ color: "var(--primary)", margin: "0 auto 0.75rem" }} />
-                <div style={{ fontSize: "1rem", fontWeight: 800, color: "var(--text-main)" }}>{selectedItem.refNo}.jpg</div>
-                <div style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginTop: "0.3rem" }}>
-                  Metode: {selectedItem.paymentMethod} | Nominal: {formatIDR(selectedItem.reportedAmount)}
+            <div style={{ minHeight: "350px", maxHeight: "75vh", backgroundColor: "rgba(255, 255, 255, 0.02)", border: "1px solid var(--border-glass)", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+              {selectedItem.proofImageUrl ? (
+                <img
+                  src={selectedItem.proofImageUrl}
+                  alt={`Bukti Transfer ${selectedItem.refNo}`}
+                  style={{ maxWidth: "100%", maxHeight: "70vh", objectFit: "contain" }}
+                />
+              ) : (
+                <div style={{ textAlign: "center", padding: "2rem" }}>
+                  <FileCheck2 size={48} style={{ color: "var(--primary)", margin: "0 auto 0.75rem" }} />
+                  <div style={{ fontSize: "1rem", fontWeight: 800, color: "var(--text-main)" }}>{selectedItem.refNo}</div>
+                  <div style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginTop: "0.3rem" }}>
+                    Metode: {selectedItem.paymentMethod} | Nominal: {formatIDR(selectedItem.reportedAmount)}
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           </div>
         </div>
