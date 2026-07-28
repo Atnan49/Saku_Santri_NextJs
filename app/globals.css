@@ -505,16 +505,407 @@ body {
   letter-spacing: 0.04em;
 }
 
+.header-subtitle {
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: var(--text-main);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
 .header-actions {
   display: flex;
   align-items: center;
   gap: 1rem;
 }
 
+/* TOP HEADER SEARCH & NOTIFICATION */
+.search-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.search-box input {
+  padding: 0.5rem 1rem 0.5rem 2.25rem;
+  font-size: 0.82rem;
+  font-weight: 500;
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface-low);
+  color: var(--text-main);
+  outline: none;
+  transition: all 0.2s ease;
+  width: 220px;
+  font-family: inherit;
+}
+
+.search-box input:focus {
+  width: 260px;
+  border-color: var(--primary);
+  background: #ffffff;
+  box-shadow: 0 0 0 3px var(--primary-glow);
+}
+
+.search-icon {
+  position: absolute;
+  left: 0.75rem;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.notification-btn {
+  position: relative;
+  padding: 0.5rem;
+  border-radius: var(--radius-md);
+  background: var(--bg-surface-low);
+  border: 1px solid var(--border-glass);
+  color: var(--text-main);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.notification-btn:hover {
+  background: var(--bg-surface-hover);
+  color: var(--primary);
+  border-color: var(--border-glass-bright);
+}
+
+.notification-badge {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--status-ditolak);
+  border: 2px solid #ffffff;
+}
+
+/* =========================================================================
+   STATUS BADGE STYLES (iOS GLOW PILL)
+   ========================================================================= */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.8rem;
+  border-radius: var(--radius-full);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.status-badge.status-lunas {
+  background: var(--status-lunas-bg);
+  color: var(--status-lunas);
+  border: 1px solid rgba(21, 69, 57, 0.3);
+  box-shadow: 0 2px 8px rgba(21, 69, 57, 0.12);
+}
+
+.status-badge.status-menunggu {
+  background: var(--status-menunggu-bg);
+  color: var(--status-menunggu);
+  border: 1px solid rgba(117, 91, 0, 0.3);
+  box-shadow: 0 2px 8px rgba(117, 91, 0, 0.12);
+}
+
+.status-badge.status-ditolak {
+  background: var(--status-ditolak-bg);
+  color: var(--status-ditolak);
+  border: 1px solid rgba(186, 26, 26, 0.3);
+  box-shadow: 0 2px 8px rgba(186, 26, 26, 0.12);
+}
+
+.status-badge.status-default {
+  background: var(--bg-surface-hover);
+  color: var(--text-muted);
+  border: 1px solid var(--border-glass);
+}
+
+/* =========================================================================
+   macOS WINDOW HEADER STYLES
+   ========================================================================= */
+.mac-window-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1.25rem;
+  background: rgba(255, 255, 255, 0.85);
+  border-bottom: 1px solid var(--border-glass);
+  border-top-left-radius: var(--radius-lg);
+  border-top-right-radius: var(--radius-lg);
+  backdrop-filter: blur(10px);
+}
+
+.mac-traffic-lights {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.mac-traffic-lights .dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  display: inline-block;
+  transition: transform 0.15s ease, filter 0.15s ease;
+  cursor: pointer;
+}
+
+.mac-traffic-lights .dot:hover {
+  transform: scale(1.18);
+  filter: brightness(1.1);
+}
+
+.mac-traffic-lights .dot-red {
+  background: #ff5f56;
+  border: 1px solid #e0443e;
+}
+
+.mac-traffic-lights .dot-yellow {
+  background: #ffbd2e;
+  border: 1px solid #dea123;
+}
+
+.mac-traffic-lights .dot-green {
+  background: #27c93f;
+  border: 1px solid #1aab29;
+}
+
+.mac-window-title {
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: var(--text-main);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.mac-window-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* =========================================================================
+   SEGMENTED CONTROL STYLES (iOS / macOS TAB SWITCHER)
+   ========================================================================= */
+.segmented-control-container {
+  display: inline-flex;
+  background: var(--bg-surface-low);
+  border: 1px solid var(--border-glass);
+  padding: 3px;
+  border-radius: var(--radius-md);
+  gap: 2px;
+}
+
+.segmented-item {
+  padding: 0.5rem 1.1rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.segmented-item:hover {
+  color: var(--text-main);
+}
+
+.segmented-item.active {
+  background: #ffffff;
+  color: var(--primary);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  font-weight: 800;
+}
+
+/* =========================================================================
+   BOTTOM SHEET STYLES (iOS MOBILE MODAL)
+   ========================================================================= */
+.bottom-sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(6px);
+  z-index: 100;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.bottom-sheet-content {
+  width: 100%;
+  max-width: 640px;
+  background: #ffffff;
+  border-top-left-radius: 24px;
+  border-top-right-radius: 24px;
+  padding: 1.5rem 1.5rem 2rem;
+  border: 1px solid var(--border-glass);
+  border-bottom: none;
+  box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.15);
+  animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.bottom-sheet-handle {
+  width: 44px;
+  height: 5px;
+  background: var(--border-glass);
+  border-radius: 9999px;
+  margin: 0 auto 1.25rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.bottom-sheet-handle:hover {
+  background: var(--border-glass-bright);
+}
+
+.bottom-sheet-title {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--text-main);
+  margin-bottom: 1rem;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+/* =========================================================================
+   FORM CONTROLS & BUTTON UTILITIES
+   ========================================================================= */
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.form-label {
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.form-input, .form-select {
+  width: 100%;
+  height: 42px;
+  padding: 0 1rem;
+  background: var(--bg-surface-low);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-md);
+  color: var(--text-main);
+  font-size: 0.88rem;
+  font-weight: 500;
+  font-family: inherit;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.form-input:focus, .form-select:focus {
+  border-color: var(--primary);
+  background: #ffffff;
+  box-shadow: 0 0 0 3px var(--primary-glow);
+}
+
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1.2rem;
+  background: var(--primary);
+  color: #ffffff;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(21, 69, 57, 0.2);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--primary-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(21, 69, 57, 0.3);
+}
+
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1.2rem;
+  background: var(--bg-surface-low);
+  color: var(--text-main);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-md);
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: var(--bg-surface-hover);
+  border-color: var(--border-glass-bright);
+}
+
+.btn-danger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1.2rem;
+  background: var(--status-ditolak-bg);
+  color: var(--status-ditolak);
+  border: 1px solid var(--status-ditolak);
+  border-radius: var(--radius-md);
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: rgba(186, 26, 26, 0.2);
+}
+
+/* =========================================================================
+   MODAL OVERLAY
+   ========================================================================= */
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.75);
+  background: rgba(0, 0, 0, 0.65);
   backdrop-filter: blur(8px);
   z-index: 100;
   display: flex;
@@ -594,3 +985,4 @@ body {
     min-width: 650px;
   }
 }
+
