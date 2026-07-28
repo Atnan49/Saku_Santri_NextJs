@@ -6,8 +6,11 @@ import TopHeader from "@/components/ui/TopHeader";
 import DigitalReceiptModal, { DigitalReceiptData } from "@/components/ui/DigitalReceiptModal";
 import GlassCard from "@/components/ui/GlassCard";
 import StatusBadge from "@/components/ui/StatusBadge";
+import SegmentedControl from "@/components/ui/SegmentedControl";
 import { formatIDR, formatDateIndonesian } from "@/lib/utils";
 import { getWaliDashboardData } from "@/lib/actions/laporan";
+import { submitPaymentProof } from "@/lib/actions/pembayaran";
+import { submitTopupSaku } from "@/lib/actions/uang-saku";
 import {
   Users,
   Printer,
@@ -16,7 +19,10 @@ import {
   AlertCircle,
   Download,
   UploadCloud,
-  Loader2
+  Loader2,
+  Wallet,
+  Receipt,
+  CheckCircle2,
 } from "lucide-react";
 
 interface TagihanItem {
@@ -32,6 +38,10 @@ interface TagihanItem {
 export default function WaliDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [waliData, setWaliData] = useState<any>(null);
+  const [transactionType, setTransactionType] = useState<"TAGIHAN" | "TOPUP">("TAGIHAN");
+  const [selectedSiswaId, setSelectedSiswaId] = useState<string>("");
+  const [topupNominal, setTopupNominal] = useState<string>("");
+
   const [selectedTagihan, setSelectedTagihan] = useState<Array<string>>([]);
   const [refNumber, setRefNumber] = useState("");
   const [transferDate, setTransferDate] = useState("");
@@ -49,6 +59,10 @@ export default function WaliDashboardPage() {
       try {
         const wali = await getWaliDashboardData();
         setWaliData(wali);
+
+        if (wali.siswa && wali.siswa.length > 0) {
+          setSelectedSiswaId(wali.siswa[0].id);
+        }
 
         const allBills: TagihanItem[] = [];
         (wali.siswa || []).forEach((student: any) => {
@@ -98,27 +112,61 @@ export default function WaliDashboardPage() {
     }
   };
 
-  const handleSendVerification = (e: React.FormEvent) => {
+  const handleSendVerification = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!refNumber || !uploadedFile) {
-      alert("Mohon isi nomor referensi bank dan lampirkan berkas bukti transfer.");
-      return;
+
+    if (transactionType === "TAGIHAN") {
+      if (selectedTagihan.length === 0) {
+        alert("Silakan centang minimal 1 tagihan dari tabel di atas.");
+        return;
+      }
+    } else {
+      if (!selectedSiswaId) {
+        alert("Silakan pilih santri terlebih dahulu.");
+        return;
+      }
+      if (!topupNominal || Number(topupNominal) < 10000) {
+        alert("Nominal topup saku minimal Rp 10.000.");
+        return;
+      }
     }
 
     setIsSubmitting(true);
 
-    setTimeout(() => {
-      if (selectedTagihan.length > 0) {
-        setTagihanList((prev) =>
-          prev.map((t) => (selectedTagihan.includes(t.id) ? { ...t, status: "MENUNGGU_VERIFIKASI_ADMIN" } : t))
-        );
-      } else {
-        setTagihanList((prev) =>
-          prev.map((t, idx) => (idx === 0 ? { ...t, status: "MENUNGGU_VERIFIKASI_ADMIN" } : t))
-        );
+    try {
+      let buktiUrl = "https://public.blob.vercel-storage.com/dummy-proof.png";
+
+      // Upload file jika ada
+      if (uploadedFile) {
+        const formData = new FormData();
+        formData.append("file", uploadedFile);
+        const uploadRes = await fetch("/api/upload", {
+          method: "POST",
+          body: formData,
+        });
+        const uploadData = await uploadRes.json();
+        if (uploadData.success && uploadData.url) {
+          buktiUrl = uploadData.url;
+        }
       }
 
-      setIsSubmitting(false);
+      if (transactionType === "TAGIHAN") {
+        for (const tagihanId of selectedTagihan) {
+          await submitPaymentProof({
+            tagihanId,
+            buktiUrl,
+            catatanWali: refNumber ? `No Ref: ${refNumber}` : undefined,
+          });
+        }
+      } else {
+        await submitTopupSaku({
+          siswaId: selectedSiswaId,
+          nominal: Number(topupNominal),
+          buktiUrl,
+          catatanWali: refNumber ? `No Ref: ${refNumber}` : undefined,
+        });
+      }
+
       setUploadSuccess(true);
 
       setTimeout(() => {
@@ -127,9 +175,19 @@ export default function WaliDashboardPage() {
         setTransferDate("");
         setUploadedFile(null);
         setSelectedTagihan([]);
-        alert("Bukti transaksi berhasil dikirim! Menunggu verifikasi admin.");
+        setTopupNominal("");
+        alert(
+          transactionType === "TAGIHAN"
+            ? "Bukti pembayaran tagihan berhasil dikirim! Menunggu verifikasi admin."
+            : "Pengajuan topup saku santri berhasil dikirim! Menunggu verifikasi admin."
+        );
+        window.location.reload();
       }, 800);
-    }, 600);
+    } catch (err: any) {
+      alert(err.message || "Gagal mengirim bukti verifikasi.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const openReceiptModal = (receipt: DigitalReceiptData) => {
@@ -324,11 +382,110 @@ export default function WaliDashboardPage() {
                       Formulir Setor Bukti Transaksi
                     </h3>
                     <p style={{ fontSize: "0.78rem", color: "var(--text-muted)", marginTop: "0.2rem" }}>
-                      Lampirkan bukti transfer resmi setelah melakukan pembayaran ke rekening pesantren.
+                      Pilih jenis setoran & lampirkan bukti transfer resmi setelah transfer ke rekening pesantren.
                     </p>
                   </div>
 
+                  {/* Toggle Pilihan Jenis Setoran */}
+                  <div>
+                    <label style={{ fontSize: "0.75rem", fontWeight: 800, textTransform: "uppercase", color: "var(--text-muted)", marginBottom: "0.4rem", display: "block" }}>
+                      Jenis Setoran / Transaksi
+                    </label>
+                    <SegmentedControl
+                      options={["Bayar Tagihan SPP", "Top Up Uang Saku"]}
+                      selectedValue={transactionType === "TAGIHAN" ? "Bayar Tagihan SPP" : "Top Up Uang Saku"}
+                      onChange={(val) => setTransactionType(val === "Bayar Tagihan SPP" ? "TAGIHAN" : "TOPUP")}
+                    />
+                  </div>
+
                   <form onSubmit={handleSendVerification} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                    {transactionType === "TAGIHAN" ? (
+                      <div style={{ backgroundColor: "var(--bg-surface-low)", border: "1px solid var(--border-glass)", borderRadius: "8px", padding: "0.85rem", fontSize: "0.82rem" }}>
+                        {selectedTagihan.length > 0 ? (
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                            <span><strong>{selectedTagihan.length}</strong> tagihan dipilih dari tabel</span>
+                            <span style={{ fontWeight: 800, color: "var(--primary)", fontSize: "0.95rem" }}>{formatIDR(totalSelectedNominal)}</span>
+                          </div>
+                        ) : (
+                          <span style={{ color: "var(--status-menunggu)", fontWeight: 600 }}>
+                            ⚠️ Silakan centang tagihan yang ingin dibayar dari tabel "Buku Besar Tagihan" di atas.
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
+                        <div>
+                          <label style={{ fontSize: "0.78rem", fontWeight: 700, color: "var(--text-muted)" }}>Pilih Santri</label>
+                          <select
+                            value={selectedSiswaId}
+                            onChange={(e) => setSelectedSiswaId(e.target.value)}
+                            style={{
+                              width: "100%",
+                              padding: "0.6rem 0.85rem",
+                              border: "1px solid var(--border-glass)",
+                              borderRadius: "8px",
+                              backgroundColor: "var(--bg-app)",
+                              color: "var(--text-main)",
+                              fontSize: "0.88rem",
+                              marginTop: "0.2rem",
+                            }}
+                          >
+                            {students.map((student: any) => (
+                              <option key={student.id} value={student.id}>
+                                {student.name} (Kelas {student.kelas?.name || "-"})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label style={{ fontSize: "0.78rem", fontWeight: 700, color: "var(--text-muted)" }}>Nominal Top Up Saku (Rp)</label>
+                          <input
+                            type="number"
+                            min="10000"
+                            placeholder="Contoh: 50000"
+                            value={topupNominal}
+                            onChange={(e) => setTopupNominal(e.target.value)}
+                            required
+                            style={{
+                              width: "100%",
+                              padding: "0.6rem 0.85rem",
+                              border: "1px solid var(--border-glass)",
+                              borderRadius: "8px",
+                              backgroundColor: "var(--bg-app)",
+                              color: "var(--text-main)",
+                              fontSize: "1rem",
+                              fontWeight: 700,
+                              fontFamily: "'JetBrains Mono', monospace",
+                              marginTop: "0.2rem",
+                            }}
+                          />
+                          {/* Quick buttons */}
+                          <div style={{ display: "flex", gap: "0.35rem", marginTop: "0.4rem", flexWrap: "wrap" }}>
+                            {[20000, 50000, 100000, 200000].map((amt) => (
+                              <button
+                                key={amt}
+                                type="button"
+                                onClick={() => setTopupNominal(String(amt))}
+                                style={{
+                                  padding: "0.2rem 0.5rem",
+                                  fontSize: "0.72rem",
+                                  fontWeight: 700,
+                                  border: "1px solid var(--border-glass)",
+                                  borderRadius: "4px",
+                                  backgroundColor: "var(--bg-surface-low)",
+                                  color: "var(--text-main)",
+                                  cursor: "pointer",
+                                }}
+                              >
+                                {formatIDR(amt)}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
                       <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
                         <label style={{ fontSize: "0.78rem", fontWeight: 700, color: "var(--text-muted)" }}>Nomor Referensi Bank</label>
@@ -405,17 +562,34 @@ export default function WaliDashboardPage() {
                         type="submit"
                         disabled={isSubmitting || uploadSuccess}
                         style={{
-                          padding: "0.6rem 1.25rem",
+                          padding: "0.65rem 1.4rem",
                           fontSize: "0.85rem",
-                          fontWeight: 700,
+                          fontWeight: 800,
                           backgroundColor: "var(--primary)",
                           color: "#FFF",
                           border: "none",
                           borderRadius: "8px",
-                          cursor: "pointer",
+                          cursor: isSubmitting ? "not-allowed" : "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "0.5rem",
                         }}
                       >
-                        {isSubmitting ? "MENGIRIM..." : uploadSuccess ? "BERHASIL DIKIRIM!" : "KIRIM VERIFIKASI"}
+                        {isSubmitting ? (
+                          <>
+                            <Loader2 className="animate-spin" size={16} />
+                            <span>MENGIRIM...</span>
+                          </>
+                        ) : uploadSuccess ? (
+                          <>
+                            <CheckCircle2 size={16} />
+                            <span>BERHASIL DIKIRIM!</span>
+                          </>
+                        ) : (
+                          <span>
+                            {transactionType === "TAGIHAN" ? "KIRIM BUKTI BAYAR SPP" : "AJUKAN TOP UP UANG SAKU"}
+                          </span>
+                        )}
                       </button>
                     </div>
                   </form>
