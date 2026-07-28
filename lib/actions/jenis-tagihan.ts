@@ -8,6 +8,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
+import { TagihanType } from "@prisma/client";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
@@ -33,7 +34,7 @@ export async function getJenisTagihanList() {
 
 export async function createJenisTagihan(data: {
   name: string;
-  type: "BULANAN" | "TAHUNAN" | "BEBAS";
+  type: TagihanType;
   nominal: number;
 }) {
   await requireAdmin();
@@ -70,7 +71,7 @@ export async function updateJenisTagihan(
   id: string,
   data: {
     name?: string;
-    type?: "BULANAN" | "TAHUNAN" | "BEBAS";
+    type?: TagihanType;
     nominal?: number;
   }
 ) {
