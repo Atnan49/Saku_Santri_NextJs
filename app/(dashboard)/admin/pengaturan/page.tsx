@@ -13,7 +13,7 @@ import GlassCard from "@/components/ui/GlassCard";
 import SegmentedControl from "@/components/ui/SegmentedControl";
 import { formatIDR } from "@/lib/utils";
 import { getTahunAjaranList, createTahunAjaran, setActiveTahunAjaran } from "@/lib/actions/tahun-ajaran";
-import { getJenisTagihanList, createJenisTagihan } from "@/lib/actions/jenis-tagihan";
+import { getJenisTagihanList, createJenisTagihan, updateJenisTagihan } from "@/lib/actions/jenis-tagihan";
 import { getWaliMuridList, updateUserPassword } from "@/lib/actions/user";
 import {
   Settings,
@@ -48,7 +48,7 @@ export default function AdminPengaturanPage() {
   // Form State Jenis Tagihan
   const [jenisNama, setJenisNama] = useState("");
   const [jenisNominal, setJenisNominal] = useState("");
-  const [jenisType, setJenisType] = useState<"BULANAN" | "TAHUNAN">("BULANAN");
+  const [jenisType, setJenisType] = useState<"BULANAN" | "TAHUNAN" | "BEBAS">("BULANAN");
   const [jenisList, setJenisList] = useState<any[]>([]);
   const [savingJenis, setSavingJenis] = useState(false);
 
@@ -78,6 +78,14 @@ export default function AdminPengaturanPage() {
       if (sppMaster) {
         setNominalSPP(String(sppMaster.nominal));
       }
+
+      // Load data rekening bank dari localStorage jika tersedia
+      const savedBca = localStorage.getItem("bank_bca");
+      const savedBsi = localStorage.getItem("bank_bsi");
+      const savedAtasNama = localStorage.getItem("bank_atas_nama");
+      if (savedBca) setBankBca(savedBca);
+      if (savedBsi) setBankBsi(savedBsi);
+      if (savedAtasNama) setAtasNama(savedAtasNama);
     } catch (err) {
       console.error("Gagal memuat pengaturan:", err);
     } finally {
@@ -110,6 +118,10 @@ export default function AdminPengaturanPage() {
           type: "BULANAN",
           nominal: Number(nominalSPP),
         });
+      } else {
+        await updateJenisTagihan(sppMaster.id, {
+          nominal: Number(nominalSPP),
+        });
       }
       setSppSavedAlert(true);
       await loadData();
@@ -121,6 +133,9 @@ export default function AdminPengaturanPage() {
 
   const handleSaveBank = (e: React.FormEvent) => {
     e.preventDefault();
+    localStorage.setItem("bank_bca", bankBca);
+    localStorage.setItem("bank_bsi", bankBsi);
+    localStorage.setItem("bank_atas_nama", atasNama);
     setBankSavedAlert(true);
     setTimeout(() => setBankSavedAlert(false), 2000);
   };
@@ -352,7 +367,7 @@ export default function AdminPengaturanPage() {
                       <label style={{ fontSize: "0.75rem", fontWeight: 800, textTransform: "uppercase", color: "var(--text-muted)" }}>Tipe Tagihan</label>
                       <select
                         value={jenisType}
-                        onChange={(e) => setJenisType(e.target.value as "BULANAN" | "TAHUNAN")}
+                        onChange={(e) => setJenisType(e.target.value as "BULANAN" | "TAHUNAN" | "BEBAS")}
                         style={{ width: "100%", padding: "0.6rem", border: "1px solid var(--border-glass)", borderRadius: "4px", marginTop: "0.2rem" }}
                       >
                         <option value="BULANAN">Bulanan</option>
@@ -380,7 +395,7 @@ export default function AdminPengaturanPage() {
                         <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>Tipe: {j.type}</div>
                       </div>
                       <div style={{ fontWeight: 800, color: "var(--primary)" }}>
-                        Rp {j.nominal.toLocaleString("id-ID")}
+                        Rp {Number(j.nominal).toLocaleString("id-ID")}
                       </div>
                     </div>
                   ))}

@@ -28,7 +28,8 @@ export default function SidebarNav({
 }: SidebarNavProps) {
   const isBendahara = userRole === "BENDAHARA";
   const isWali = userRole === "WALI MURID" || userRole === "WALIMURID";
-  const isAdmin = !isBendahara && !isWali;
+  const isKoperasi = userRole === "KOPERASI";
+  const isAdmin = !isBendahara && !isWali && !isKoperasi;
 
   let navItems = [];
 
@@ -45,6 +46,10 @@ export default function SidebarNav({
       { id: "DASHBOARD", label: "DASHBOARD", icon: LayoutDashboard, href: "/bendahara/dashboard" },
       { id: "APPROVAL", label: "APPROVAL FINAL", icon: ShieldAlert, href: "/bendahara/approval" },
       { id: "LAPORAN", label: "REKAP LAPORAN", icon: FileText, href: "/bendahara/laporan" },
+    ];
+  } else if (isKoperasi) {
+    navItems = [
+      { id: "DASHBOARD", label: "KASIR KOPERASI", icon: LayoutDashboard, href: "/koperasi/dashboard" },
     ];
   } else {
     navItems = [

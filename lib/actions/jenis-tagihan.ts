@@ -33,7 +33,7 @@ export async function getJenisTagihanList() {
 
 export async function createJenisTagihan(data: {
   name: string;
-  type: "BULANAN" | "TAHUNAN";
+  type: "BULANAN" | "TAHUNAN" | "BEBAS";
   nominal: number;
 }) {
   await requireAdmin();
@@ -70,7 +70,7 @@ export async function updateJenisTagihan(
   id: string,
   data: {
     name?: string;
-    type?: "BULANAN" | "TAHUNAN";
+    type?: "BULANAN" | "TAHUNAN" | "BEBAS";
     nominal?: number;
   }
 ) {

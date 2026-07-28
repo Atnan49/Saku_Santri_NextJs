@@ -148,6 +148,7 @@ enum UserRole {
 enum TagihanType {
   BULANAN
   TAHUNAN
+  BEBAS
 }
 
 enum TagihanStatus {

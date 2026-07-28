@@ -66,6 +66,20 @@ body {
   overflow-x: hidden;
 }
 
+/* Spinner animation for Lucide Loader2 */
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
 /* Glassmorphism utility class */
 .glass-card {
   background: var(--bg-surface);

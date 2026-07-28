@@ -197,6 +197,9 @@ export async function deleteUser(userId: string) {
   // Hapus notifikasi terkait
   await prisma.notification.deleteMany({ where: { userId } });
 
+  // Hapus riwayat transaksi koperasi yang dilakukan kasir ini jika ada
+  await prisma.transaksiKoperasi.deleteMany({ where: { kasirId: userId } });
+
   // Hapus profil wali jika ada
   if (user.wali) {
     await prisma.waliMurid.delete({ where: { userId } });

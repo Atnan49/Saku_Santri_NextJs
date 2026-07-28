@@ -167,8 +167,31 @@ export async function deleteSantri(id: string) {
     );
   }
 
-  // Hapus semua tagihan LUNAS terkait terlebih dahulu
+  // Hapus semua pembayaran terkait tagihan siswa ini terlebih dahulu
+  const tagihanIds = (
+    await prisma.tagihan.findMany({
+      where: { siswaId: id },
+      select: { id: true },
+    })
+  ).map((t: { id: string }) => t.id);
+
+  if (tagihanIds.length > 0) {
+    await prisma.pembayaran.deleteMany({
+      where: { tagihanId: { in: tagihanIds } },
+    });
+  }
+
+  // Hapus semua tagihan terkait
   await prisma.tagihan.deleteMany({
+    where: { siswaId: id },
+  });
+
+  // Hapus riwayat topup saku dan transaksi koperasi
+  await prisma.topupSaku.deleteMany({
+    where: { siswaId: id },
+  });
+
+  await prisma.transaksiKoperasi.deleteMany({
     where: { siswaId: id },
   });
 

@@ -7,7 +7,7 @@
 // =========================================================================
 
 import React from "react";
-import Sidebar from "@/components/ui/Sidebar";
+import SidebarNav from "@/components/ui/SidebarNav";
 import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
 
@@ -90,7 +90,6 @@ export default async function KwitansiDigitalPage({ params }: PageProps) {
         }
 
         .kwitansi-main {
-          margin-left: 288px;
           flex: 1;
           display: flex;
           flex-direction: column;
@@ -99,10 +98,8 @@ export default async function KwitansiDigitalPage({ params }: PageProps) {
 
         /* Top header bar */
         .kwitansi-topbar {
-          position: fixed;
+          position: sticky;
           top: 0;
-          left: 288px;
-          right: 0;
           height: 64px;
           background: #ffffff;
           border-bottom: 1px solid #c0c8c4;
@@ -591,7 +588,7 @@ export default async function KwitansiDigitalPage({ params }: PageProps) {
       `}</style>
 
       <div className="kwitansi-layout">
-        <Sidebar role="bendahara" userName="Admin Utama" userRole="Administrator" />
+        <SidebarNav activeItem="APPROVAL" userRole="BENDAHARA" userName="Bendahara Sekolah" />
 
         <div className="kwitansi-main">
           {/* Top bar */}
