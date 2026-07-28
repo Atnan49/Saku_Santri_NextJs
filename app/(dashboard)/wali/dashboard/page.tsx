@@ -12,6 +12,7 @@ import { getWaliDashboardData } from "@/lib/actions/laporan";
 import { submitPaymentProof } from "@/lib/actions/pembayaran";
 import { submitTopupSaku, updateLimitHarian } from "@/lib/actions/uang-saku";
 import { getInstitutionSettings } from "@/lib/actions/settings";
+import { convertImageToWebP } from "@/lib/image-converter";
 import {
   Users,
   Printer,
@@ -155,9 +156,15 @@ export default function WaliDashboardPage() {
     return sum + (item ? item.nominal : 0);
   }, 0);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setUploadedFile(e.target.files[0]);
+      const original = e.target.files[0];
+      try {
+        const webp = await convertImageToWebP(original);
+        setUploadedFile(webp);
+      } catch (err) {
+        setUploadedFile(original);
+      }
     }
   };
 
@@ -183,7 +190,7 @@ export default function WaliDashboardPage() {
     setIsSubmitting(true);
 
     try {
-      let buktiUrl = "https://public.blob.vercel-storage.com/dummy-proof.png";
+      let buktiUrl = "/uploads/bukti-placeholder.svg";
 
       // Upload file jika ada
       if (uploadedFile) {
