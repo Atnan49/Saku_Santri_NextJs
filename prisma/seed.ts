@@ -1,7 +1,8 @@
 // =========================================================================
 // TANGGUNG JAWAB: Yafi (Database) & Atnan (Backend)
-// Deskripsi: Script pembersihan data dummy dan pembuatan akun inti saja.
-//            Hanya menyisakan akun Admin dan Bendahara untuk pengujian dari nol.
+// Deskripsi: Script reset database yang membersihkan seluruh riwayat transaksi,
+//            tagihan, pembayaran, dan notifikasi, namun tetap mempertahankan
+//            data akun User, Wali Murid, Siswa, Kelas, dan Jenis Tagihan.
 // Cara menjalankan: npx prisma db seed
 // =========================================================================
 
@@ -11,30 +12,30 @@ import bcrypt from "bcrypt";
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log("Memulai pembersihan data dummy (Reset dari nol)...");
+  console.log("Memulai pembersihan data transaksi & tagihan...");
 
-  // 1. Hapus semua data transaksi & data anak/wali
-  await prisma.pembayaran.deleteMany({});
-  await prisma.topupSaku.deleteMany({});
-  await prisma.transaksiKoperasi.deleteMany({});
-  await prisma.tagihan.deleteMany({});
-  await prisma.notification.deleteMany({});
-  await prisma.siswa.deleteMany({});
-  await prisma.waliMurid.deleteMany({});
-  await prisma.jenisTagihan.deleteMany({});
-  await prisma.kelas.deleteMany({});
-  await prisma.tahunAjaran.deleteMany({});
+  // 1. Hapus data transaksi & pembayaran
+  const delPembayaran = await prisma.pembayaran.deleteMany({});
+  const delTopup = await prisma.topupSaku.deleteMany({});
+  const delTransaksiKoperasi = await prisma.transaksiKoperasi.deleteMany({});
+  const delTagihan = await prisma.tagihan.deleteMany({});
+  const delNotif = await prisma.notification.deleteMany({});
 
-  // 2. Hapus semua akun user ber-role WALIMURID atau KOPERASI
-  await prisma.user.deleteMany({
-    where: {
-      role: { in: ["WALIMURID", "KOPERASI"] },
+  console.log(`- Terhapus ${delPembayaran.count} data pembayaran`);
+  console.log(`- Terhapus ${delTopup.count} data topup saku`);
+  console.log(`- Terhapus ${delTransaksiKoperasi.count} data transaksi koperasi`);
+  console.log(`- Terhapus ${delTagihan.count} data tagihan`);
+  console.log(`- Terhapus ${delNotif.count} notifikasi`);
+
+  // 2. Reset saldo saku seluruh siswa ke 0
+  await prisma.siswa.updateMany({
+    data: {
+      saldoSaku: 0,
     },
   });
+  console.log("- Saldo saku seluruh santri berhasil di-reset ke Rp 0");
 
-  console.log("Semua data dummy berhasil dibersihkan!");
-
-  // 3. Buat/Update Akun Inti: Admin & Bendahara
+  // 3. Pastikan Akun Inti (Admin & Bendahara) Selalu Tersedia
   const adminPassword = await bcrypt.hash("admin123", 10);
   const bendaharaPassword = await bcrypt.hash("bendahara123", 10);
 
@@ -70,9 +71,16 @@ async function main() {
     },
   });
 
-  console.log(`Akun Admin dibuat: ${admin.username} (Password: admin123)`);
-  console.log(`Akun Bendahara dibuat: ${bendahara.username} (Password: bendahara123)`);
-  console.log("Reset database selesai 100%! Aplikasi siap digunakan dari NOL.");
+  const totalUsers = await prisma.user.count();
+  const totalSiswa = await prisma.siswa.count();
+
+  console.log("---------------------------------------------------------");
+  console.log(`Akun Admin     : ${admin.username} (Password: admin123)`);
+  console.log(`Akun Bendahara : ${bendahara.username} (Password: bendahara123)`);
+  console.log(`Total Akun Tersedia : ${totalUsers} User (Dipertahankan)`);
+  console.log(`Total Data Santri   : ${totalSiswa} Santri (Dipertahankan)`);
+  console.log("---------------------------------------------------------");
+  console.log("Reset database selesai! Transaksi bersih & Akun tetap aman.");
 }
 
 main()
@@ -83,4 +91,3 @@ main()
   .finally(async () => {
     await prisma.$disconnect();
   });
-
