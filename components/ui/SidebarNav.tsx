@@ -39,6 +39,7 @@ export default function SidebarNav({
       { id: "VERIFIKASI", label: "VERIFIKASI", icon: CheckCircle2, href: "/admin/verifikasi" },
       { id: "SANTRI", label: "DATA SANTRI", icon: Users, href: "/admin/santri" },
       { id: "TAGIHAN", label: "TAGIHAN", icon: Receipt, href: "/admin/tagihan" },
+      { id: "LAPORAN", label: "REKAP LAPORAN", icon: FileText, href: "/bendahara/laporan" },
       { id: "PENGATURAN", label: "PENGATURAN", icon: Settings, href: "/admin/pengaturan" },
     ];
   } else if (isBendahara) {

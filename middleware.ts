@@ -18,8 +18,8 @@ export default withAuth(
       return NextResponse.redirect(new URL("/login?error=UnauthorizedAdmin", req.url));
     }
     
-    // Proteksi Rute Bendahara
-    if (path.startsWith("/bendahara") && token?.role !== "BENDAHARA") {
+    // Proteksi Rute Bendahara (Bisa diakses Bendahara & Super Admin)
+    if (path.startsWith("/bendahara") && !["BENDAHARA", "ADMIN"].includes(token?.role as string)) {
       return NextResponse.redirect(new URL("/login?error=UnauthorizedBendahara", req.url));
     }
     
