@@ -76,40 +76,63 @@ export async function POST(request: Request) {
     const filename = `bukti-${timestamp}-${Math.random().toString(36).slice(2, 8)}.${extension}`;
 
     // 1. Coba upload ke Vercel Blob jika BLOB_READ_WRITE_TOKEN tersedia
-    if (process.env.BLOB_READ_WRITE_TOKEN) {
+    const blobToken = process.env.BLOB_READ_WRITE_TOKEN;
+    if (blobToken) {
       try {
         const blob = await put(`bukti-bayar/${filename}`, file, {
           access: "public",
+          token: blobToken,
         });
         return NextResponse.json({
           success: true,
           url: blob.url,
           filename: blob.pathname,
         });
-      } catch (blobErr) {
-        console.warn("Vercel Blob failed, falling back to local file storage:", blobErr);
+      } catch (blobErr: any) {
+        console.error("Vercel Blob upload failed:", blobErr);
+        if (process.env.VERCEL === "1" || process.env.NODE_ENV === "production") {
+          return NextResponse.json(
+            { error: `Gagal upload ke Vercel Blob Storage: ${blobErr?.message || "Token tidak valid"}. Pastikan BLOB_READ_WRITE_TOKEN di Vercel Dashboard sudah benar.` },
+            { status: 500 }
+          );
+        }
+      }
+    } else {
+      if (process.env.VERCEL === "1" || process.env.NODE_ENV === "production") {
+        return NextResponse.json(
+          { error: "BLOB_READ_WRITE_TOKEN tidak ditemukan di Vercel Environment Variables. Harap tambahkan token tersebut di Vercel Dashboard lalu Redeploy." },
+          { status: 500 }
+        );
       }
     }
 
-    // 2. Fallback Local Filesystem Storage (public/uploads)
-    const uploadsDir = path.join(process.cwd(), "public", "uploads");
-    if (!fs.existsSync(uploadsDir)) {
-      fs.mkdirSync(uploadsDir, { recursive: true });
+    // 2. Fallback Local Filesystem Storage (Hanya untuk Pengembangan Lokal / Non-Vercel)
+    try {
+      const uploadsDir = path.join(process.cwd(), "public", "uploads");
+      if (!fs.existsSync(uploadsDir)) {
+        fs.mkdirSync(uploadsDir, { recursive: true });
+      }
+
+      const bytes = await file.arrayBuffer();
+      const buffer = Buffer.from(bytes);
+      const filePath = path.join(uploadsDir, filename);
+
+      fs.writeFileSync(filePath, buffer);
+
+      const publicUrl = `/uploads/${filename}`;
+
+      return NextResponse.json({
+        success: true,
+        url: publicUrl,
+        filename: filename,
+      });
+    } catch (fsErr: any) {
+      console.error("Local storage write error:", fsErr);
+      return NextResponse.json(
+        { error: `Gagal menyimpan file ke penyimpanan lokal: ${fsErr?.message || fsErr}` },
+        { status: 500 }
+      );
     }
-
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
-    const filePath = path.join(uploadsDir, filename);
-
-    fs.writeFileSync(filePath, buffer);
-
-    const publicUrl = `/uploads/${filename}`;
-
-    return NextResponse.json({
-      success: true,
-      url: publicUrl,
-      filename: filename,
-    });
   } catch (error: any) {
     console.error("Upload error:", error);
     return NextResponse.json(
