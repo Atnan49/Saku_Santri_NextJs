@@ -569,24 +569,12 @@ export async function searchKwitansi(query?: string) {
     throw new Error("Anda harus login untuk mencari kwitansi.");
   }
 
-  const whereClause: any = {
-    tagihan: {
-      status: "LUNAS",
+  const rawList = await (prisma as any).pembayaran.findMany({
+    where: {
+      tagihan: {
+        status: "LUNAS",
+      },
     },
-  };
-
-  if (query && query.trim().length > 0) {
-    const q = query.trim();
-    whereClause.OR = [
-      { id: { contains: q, mode: "insensitive" } },
-      { tagihan: { siswa: { name: { contains: q, mode: "insensitive" } } } },
-      { tagihan: { siswa: { wali: { user: { name: { contains: q, mode: "insensitive" } } } } } },
-      { tagihan: { jenisTagihan: { name: { contains: q, mode: "insensitive" } } } },
-    ];
-  }
-
-  const list = await (prisma as any).pembayaran.findMany({
-    where: whereClause,
     include: {
       tagihan: {
         include: {
@@ -605,13 +593,15 @@ export async function searchKwitansi(query?: string) {
       },
     },
     orderBy: { createdAt: "desc" },
-    take: 20,
+    take: 100,
   });
 
-  return list.map((p: any) => ({
+  const mapped = rawList.map((p: any) => ({
     pembayaranId: p.id,
     receiptNo: `KW-${p.id.slice(-6).toUpperCase()}`,
-    date: p.approvedAt ? new Date(p.approvedAt).toISOString().split("T")[0] : new Date(p.createdAt).toISOString().split("T")[0],
+    date: p.approvedAt
+      ? new Date(p.approvedAt).toISOString().split("T")[0]
+      : new Date(p.createdAt).toISOString().split("T")[0],
     receivedFrom: p.tagihan?.siswa?.wali?.user?.name || "Wali Santri",
     studentName: p.tagihan?.siswa?.name || "Santri",
     studentClass: p.tagihan?.siswa?.kelas?.name || "-",
@@ -620,4 +610,26 @@ export async function searchKwitansi(query?: string) {
     verifiedBy: "Bendahara / Admin TU",
     paymentMethod: p.catatanWali || "Bank Transfer / Tunai",
   }));
+
+  if (!query || query.trim().length === 0) {
+    return mapped;
+  }
+
+  const cleanQ = query.trim().toLowerCase().replace(/^kw-/i, "").replace(/^ref-/i, "");
+
+  return mapped.filter((item: any) => {
+    const rNo = item.receiptNo.toLowerCase();
+    const sName = item.studentName.toLowerCase();
+    const pName = item.receivedFrom.toLowerCase();
+    const pFor = item.paymentFor.toLowerCase();
+    const pId = item.pembayaranId.toLowerCase();
+
+    return (
+      rNo.includes(cleanQ) ||
+      sName.includes(cleanQ) ||
+      pName.includes(cleanQ) ||
+      pFor.includes(cleanQ) ||
+      pId.includes(cleanQ)
+    );
+  });
 }
