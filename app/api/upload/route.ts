@@ -92,8 +92,12 @@ export async function POST(request: Request) {
       } catch (blobErr: any) {
         console.error("Vercel Blob upload failed:", blobErr);
         if (process.env.VERCEL === "1" || process.env.NODE_ENV === "production") {
+          let customMsg = blobErr?.message || "Token tidak valid";
+          if (customMsg.includes("private store") || customMsg.includes("public access")) {
+            customMsg = "Vercel Blob Store Anda saat ini berstatus 'Private'. Silakan ubah status Store menjadi 'Public' di Vercel Dashboard (Storage -> saku-santri-next-js-blob -> Settings -> Access Mode) agar gambar bukti transfer dapat diakses oleh browser Admin.";
+          }
           return NextResponse.json(
-            { error: `Gagal upload ke Vercel Blob Storage: ${blobErr?.message || "Token tidak valid"}. Pastikan BLOB_READ_WRITE_TOKEN di Vercel Dashboard sudah benar.` },
+            { error: `Gagal upload ke Vercel Blob Storage: ${customMsg}` },
             { status: 500 }
           );
         }
