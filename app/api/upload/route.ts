@@ -63,7 +63,16 @@ export async function POST(request: Request) {
     }
 
     const timestamp = Date.now();
-    const extension = isPdf ? "pdf" : "webp";
+    let extension = "png";
+    if (isPdf) {
+      extension = "pdf";
+    } else if (file.type === "image/jpeg" || file.type === "image/jpg") {
+      extension = "jpg";
+    } else if (file.type === "image/webp") {
+      extension = "webp";
+    } else if (file.name.includes(".")) {
+      extension = file.name.split(".").pop()?.toLowerCase() || "png";
+    }
     const filename = `bukti-${timestamp}-${Math.random().toString(36).slice(2, 8)}.${extension}`;
 
     // 1. Coba upload ke Vercel Blob jika BLOB_READ_WRITE_TOKEN tersedia

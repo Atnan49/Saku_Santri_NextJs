@@ -187,6 +187,11 @@ export default function WaliDashboardPage() {
       }
     }
 
+    if (!uploadedFile) {
+      alert("Mohon lampirkan berkas/foto bukti transfer terlebih dahulu.");
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400" viewBox="0 0 600 400" fill="none">
+  <rect width="600" height="400" rx="16" fill="#F4EFE6"/>
+  <rect x="20" y="20" width="560" height="360" rx="12" stroke="#154539" stroke-width="2" fill="#FAF7F2"/>
+  <circle cx="300" cy="150" r="48" fill="#E2F0D9"/>
+  <path d="M284 150L294 160L316 138" stroke="#154539" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="300" y="230" text-anchor="middle" fill="#154539" font-family="sans-serif" font-size="20" font-weight="bold">SETORAN UANG SAKU TUNAI VIA TU</text>
+  <text x="300" y="260" text-anchor="middle" fill="#516071" font-family="sans-serif" font-size="14">Diterima langsung oleh Petugas Tata Usaha</text>
+  <text x="300" y="310" text-anchor="middle" fill="#8C9BAE" font-family="monospace" font-size="12">SETORAN TUNAI UANG SAKU</text>
+</svg>
