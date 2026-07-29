@@ -102,7 +102,7 @@ export default function AdminPengaturanPage() {
   const [staffUsername, setStaffUsername] = useState("");
   const [staffEmail, setStaffEmail] = useState("");
   const [staffPassword, setStaffPassword] = useState("");
-  const [staffRole, setStaffRole] = useState<"ADMIN" | "BENDAHARA">("BENDAHARA");
+  const [staffRole, setStaffRole] = useState<"ADMIN" | "BENDAHARA" | "KOPERASI">("BENDAHARA");
   const [savingStaff, setSavingStaff] = useState(false);
 
   const loadData = async () => {
@@ -759,6 +759,7 @@ export default function AdminPengaturanPage() {
                     >
                       <option value="BENDAHARA">BENDAHARA KEUANGAN</option>
                       <option value="ADMIN">ADMINISTRATOR TU</option>
+                      <option value="KOPERASI">KASIR KOPERASI / MART</option>
                     </select>
                   </div>
 

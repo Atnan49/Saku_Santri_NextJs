@@ -58,7 +58,7 @@ export async function createStaffUser(data: {
   email?: string;
   name: string;
   password: string;
-  role: "ADMIN" | "BENDAHARA";
+  role: "ADMIN" | "BENDAHARA" | "KOPERASI";
 }) {
   await requireAdmin();
 

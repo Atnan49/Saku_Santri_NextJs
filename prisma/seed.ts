@@ -71,12 +71,30 @@ async function main() {
     },
   });
 
+  const koperasiPassword = await bcrypt.hash("koperasi123", 10);
+  const koperasi = await prisma.user.upsert({
+    where: { username: "koperasi" },
+    update: {
+      name: "Kasir Koperasi Mart",
+      passwordHash: koperasiPassword,
+      role: "KOPERASI",
+    },
+    create: {
+      username: "koperasi",
+      email: "koperasi@sakusantri.local",
+      passwordHash: koperasiPassword,
+      name: "Kasir Koperasi Mart",
+      role: "KOPERASI",
+    },
+  });
+
   const totalUsers = await prisma.user.count();
   const totalSiswa = await prisma.siswa.count();
 
   console.log("---------------------------------------------------------");
   console.log(`Akun Admin     : ${admin.username} (Password: admin123)`);
   console.log(`Akun Bendahara : ${bendahara.username} (Password: bendahara123)`);
+  console.log(`Akun Koperasi  : ${koperasi.username} (Password: koperasi123)`);
   console.log(`Total Akun Tersedia : ${totalUsers} User (Dipertahankan)`);
   console.log(`Total Data Santri   : ${totalSiswa} Santri (Dipertahankan)`);
   console.log("---------------------------------------------------------");
