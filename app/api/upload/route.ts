@@ -76,7 +76,8 @@ export async function POST(request: Request) {
     const filename = `bukti-${timestamp}-${Math.random().toString(36).slice(2, 8)}.${extension}`;
 
     // 1. Coba upload ke Vercel Blob jika BLOB_READ_WRITE_TOKEN tersedia
-    const blobToken = process.env.BLOB_READ_WRITE_TOKEN;
+    const rawToken = process.env.BLOB_READ_WRITE_TOKEN;
+    const blobToken = rawToken ? rawToken.trim().replace(/^["']|["']$/g, "") : "";
     if (blobToken) {
       try {
         const blob = await put(`bukti-bayar/${filename}`, file, {
