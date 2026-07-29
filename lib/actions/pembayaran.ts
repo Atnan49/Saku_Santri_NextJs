@@ -560,3 +560,64 @@ export async function getPembayaranForBendaharaApproval() {
 
   return Array.from(latestMap.values());
 }
+
+// ========== SEARCH & FETCH PAID RECEIPTS (UNTUK CETAK KWITANSI) ==========
+
+export async function searchKwitansi(query?: string) {
+  const session = await getServerSession(authOptions);
+  if (!session) {
+    throw new Error("Anda harus login untuk mencari kwitansi.");
+  }
+
+  const whereClause: any = {
+    tagihan: {
+      status: "LUNAS",
+    },
+  };
+
+  if (query && query.trim().length > 0) {
+    const q = query.trim();
+    whereClause.OR = [
+      { id: { contains: q, mode: "insensitive" } },
+      { tagihan: { siswa: { name: { contains: q, mode: "insensitive" } } } },
+      { tagihan: { siswa: { wali: { user: { name: { contains: q, mode: "insensitive" } } } } } },
+      { tagihan: { jenisTagihan: { name: { contains: q, mode: "insensitive" } } } },
+    ];
+  }
+
+  const list = await (prisma as any).pembayaran.findMany({
+    where: whereClause,
+    include: {
+      tagihan: {
+        include: {
+          siswa: {
+            include: {
+              kelas: true,
+              wali: {
+                include: {
+                  user: { select: { name: true, phone: true } },
+                },
+              },
+            },
+          },
+          jenisTagihan: true,
+        },
+      },
+    },
+    orderBy: { createdAt: "desc" },
+    take: 20,
+  });
+
+  return list.map((p: any) => ({
+    pembayaranId: p.id,
+    receiptNo: `KW-${p.id.slice(-6).toUpperCase()}`,
+    date: p.approvedAt ? new Date(p.approvedAt).toISOString().split("T")[0] : new Date(p.createdAt).toISOString().split("T")[0],
+    receivedFrom: p.tagihan?.siswa?.wali?.user?.name || "Wali Santri",
+    studentName: p.tagihan?.siswa?.name || "Santri",
+    studentClass: p.tagihan?.siswa?.kelas?.name || "-",
+    amount: Number(p.nominalDisetor || p.tagihan?.nominalAkhir) || 0,
+    paymentFor: p.tagihan?.jenisTagihan?.name || "SPP Bulanan",
+    verifiedBy: "Bendahara / Admin TU",
+    paymentMethod: p.catatanWali || "Bank Transfer / Tunai",
+  }));
+}

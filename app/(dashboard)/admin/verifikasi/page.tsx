@@ -124,10 +124,14 @@ export default function AdminVerifikasiPage() {
 
       setGeneratedReceiptData(receiptData);
       setReceiptModalOpen(true);
-      await loadData();
     } catch (err: any) {
       alert(err.message || "Gagal memverifikasi pembayaran.");
     }
+  };
+
+  const handleCloseReceiptModal = () => {
+    setReceiptModalOpen(false);
+    loadData();
   };
 
   const handleConfirmRejection = async () => {
@@ -668,7 +672,7 @@ export default function AdminVerifikasiPage() {
 
       <DigitalReceiptModal
         isOpen={receiptModalOpen}
-        onClose={() => setReceiptModalOpen(false)}
+        onClose={handleCloseReceiptModal}
         data={generatedReceiptData}
       />
     </div>

@@ -95,10 +95,14 @@ export default function BendaharaApprovalPage() {
         paymentMethod: item.catatanWali || "Bank Transfer",
       });
       setReceiptModalOpen(true);
-      await loadData();
     } catch (err: any) {
       alert(err.message || "Gagal melakukan persetujuan pembayaran.");
     }
+  };
+
+  const handleCloseReceipt = () => {
+    setReceiptModalOpen(false);
+    loadData();
   };
 
   return (
@@ -229,7 +233,7 @@ export default function BendaharaApprovalPage() {
 
       <DigitalReceiptModal
         isOpen={receiptModalOpen}
-        onClose={() => setReceiptModalOpen(false)}
+        onClose={handleCloseReceipt}
         data={receiptData}
       />
     </div>
