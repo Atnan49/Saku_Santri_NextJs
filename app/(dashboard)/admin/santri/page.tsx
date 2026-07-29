@@ -527,7 +527,7 @@ export default function AdminSantriPage() {
                 <input
                   type="text"
                   readOnly
-                  value={`SNT-${new Date().getFullYear()}-${String(santriList.length + 1).padStart(4, "0")}`}
+                  value={editingSantriId ? nisn : `SNT-${new Date().getFullYear()}-${String(santriList.length + 1).padStart(4, "0")}`}
                   style={{ width: "100%", padding: "0.6rem", border: "1px solid var(--border-glass)", borderRadius: "4px", marginTop: "0.2rem", backgroundColor: "#f0f4f2", color: "var(--primary)", fontWeight: 800, fontFamily: "'JetBrains Mono', monospace" }}
                 />
               </div>
