@@ -490,6 +490,8 @@ export async function getPembayaranForAdminVerification() {
   const pembayaran = await prisma.pembayaran.findMany({
     where: {
       tagihan: { status: "MENUNGGU_VERIFIKASI_ADMIN" },
+      verifiedAt: null,
+      catatanAdmin: null,
     },
     include: {
       tagihan: {
@@ -508,16 +510,25 @@ export async function getPembayaranForAdminVerification() {
         },
       },
     },
-    orderBy: { createdAt: "asc" },
+    orderBy: { createdAt: "desc" },
   });
 
-  return pembayaran;
+  // Ambil hanya 1 record bukti pembayaran terbaru untuk setiap tagihanId
+  const latestMap = new Map<string, typeof pembayaran[0]>();
+  for (const item of pembayaran) {
+    if (!latestMap.has(item.tagihanId)) {
+      latestMap.set(item.tagihanId, item);
+    }
+  }
+
+  return Array.from(latestMap.values());
 }
 
 export async function getPembayaranForBendaharaApproval() {
   const pembayaran = await prisma.pembayaran.findMany({
     where: {
       tagihan: { status: "MENUNGGU_APPROVAL_BENDAHARA" },
+      approvedAt: null,
     },
     include: {
       tagihan: {
@@ -536,8 +547,16 @@ export async function getPembayaranForBendaharaApproval() {
         },
       },
     },
-    orderBy: { createdAt: "asc" },
+    orderBy: { createdAt: "desc" },
   });
 
-  return pembayaran;
+  // Ambil hanya 1 record bukti pembayaran terbaru untuk setiap tagihanId
+  const latestMap = new Map<string, typeof pembayaran[0]>();
+  for (const item of pembayaran) {
+    if (!latestMap.has(item.tagihanId)) {
+      latestMap.set(item.tagihanId, item);
+    }
+  }
+
+  return Array.from(latestMap.values());
 }
