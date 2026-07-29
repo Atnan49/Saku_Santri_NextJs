@@ -195,21 +195,19 @@ export default function WaliDashboardPage() {
     setIsSubmitting(true);
 
     try {
-      let buktiUrl = "/uploads/bukti-placeholder.svg";
+      const formData = new FormData();
+      formData.append("file", uploadedFile);
+      const uploadRes = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
 
-      // Upload file jika ada
-      if (uploadedFile) {
-        const formData = new FormData();
-        formData.append("file", uploadedFile);
-        const uploadRes = await fetch("/api/upload", {
-          method: "POST",
-          body: formData,
-        });
-        const uploadData = await uploadRes.json();
-        if (uploadData.success && uploadData.url) {
-          buktiUrl = uploadData.url;
-        }
+      const uploadData = await uploadRes.json();
+      if (!uploadRes.ok || !uploadData.success || !uploadData.url) {
+        throw new Error(uploadData.error || "Gagal mengunggah berkas foto bukti transfer.");
       }
+
+      const buktiUrl = uploadData.url;
 
       if (transactionType === "TAGIHAN") {
         for (const tagihanId of selectedTagihan) {
