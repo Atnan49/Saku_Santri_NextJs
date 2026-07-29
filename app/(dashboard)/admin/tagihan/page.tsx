@@ -119,18 +119,29 @@ export default function AdminTagihanPage() {
     try {
       let tId = activeTahun?.id;
       if (!tId) {
-        const tNew = await createTahunAjaran("2025/2026");
-        tId = tNew.id;
+        const tList = await getTahunAjaranList();
+        if (tList.length > 0) {
+          tId = tList[0].id;
+        } else {
+          const tNew = await createTahunAjaran("2025/2026");
+          tId = tNew.id;
+        }
       }
 
       let jId = jenisSPP?.id;
       if (!jId) {
-        const jNew = await createJenisTagihan({
-          name: "SPP Bulanan Standar",
-          type: "BULANAN",
-          nominal: 250000,
-        });
-        jId = jNew.id;
+        const jList = await getJenisTagihanList();
+        const existing = jList.find((j: any) => j.type === "BULANAN" || j.name.toLowerCase().includes("spp"));
+        if (existing) {
+          jId = existing.id;
+        } else {
+          const jNew = await createJenisTagihan({
+            name: "SPP Bulanan Standar",
+            type: "BULANAN",
+            nominal: 250000,
+          });
+          jId = jNew.id;
+        }
       }
 
       const dueDateStr = `${bulan}-10T23:59:59.000Z`;

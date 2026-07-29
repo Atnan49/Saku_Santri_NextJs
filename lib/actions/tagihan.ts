@@ -203,9 +203,9 @@ export async function generateMonthlyBills(data: {
   // Group siswa by wali untuk menghindari pengiriman WA ganda
   const waliMap = new Map<string, { phone: string; userId: string; anakNames: string[] }>();
   for (const siswa of siswaToGenerate) {
-    const phone = siswa.wali.user.phone;
-    const userId = siswa.wali.user.id;
-    if (phone) {
+    const phone = siswa.wali?.user?.phone;
+    const userId = siswa.wali?.user?.id;
+    if (phone && userId) {
       const key = phone;
       if (!waliMap.has(key)) {
         waliMap.set(key, { phone, userId, anakNames: [] });

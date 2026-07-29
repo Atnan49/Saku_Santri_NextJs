@@ -32,9 +32,15 @@ export async function getTahunAjaranList() {
 }
 
 export async function getActiveTahunAjaran() {
-  const active = await prisma.tahunAjaran.findFirst({
+  let active = await prisma.tahunAjaran.findFirst({
     where: { isActive: true },
   });
+
+  if (!active) {
+    active = await prisma.tahunAjaran.findFirst({
+      orderBy: { year: "desc" },
+    });
+  }
 
   return active;
 }

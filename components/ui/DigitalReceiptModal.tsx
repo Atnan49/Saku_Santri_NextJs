@@ -35,7 +35,14 @@ export default function DigitalReceiptModal({
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div
+      className="modal-overlay"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
+    >
       <div
         className="modal-content printable-area"
         onClick={(e) => e.stopPropagation()}
