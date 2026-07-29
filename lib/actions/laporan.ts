@@ -244,21 +244,21 @@ export async function generateExcelReportBuffer(filters?: {
 
     return {
       No: index + 1,
-      "Nama Santri": t.siswa.name,
-      NISN: t.siswa.nisn,
-      Kelas: t.siswa.kelas.name,
-      "Wali Murid": t.siswa.wali.user.name,
-      "No HP Wali": t.siswa.wali.user.phone || "-",
-      "Jenis Tagihan": t.jenisTagihan.name,
+      "Nama Santri": t.siswa?.name || "-",
+      NISN: t.siswa?.nisn || "-",
+      Kelas: t.siswa?.kelas?.name || "-",
+      "Wali Murid": t.siswa?.wali?.user?.name || "-",
+      "No HP Wali": t.siswa?.wali?.user?.phone || "-",
+      "Jenis Tagihan": t.jenisTagihan?.name || "-",
       Periode: t.period || "-",
-      "Tahun Ajaran": t.tahunAjaran.year,
+      "Tahun Ajaran": t.tahunAjaran?.year || "-",
       "Nominal Tagihan": nominalAkhir,
       "Telah Terbayar": nominalTerbayar,
       "Sisa Tagihan": sisa,
-      "Jatuh Tempo": t.dueDate.toISOString().split("T")[0],
+      "Jatuh Tempo": t.dueDate ? t.dueDate.toISOString().split("T")[0] : "-",
       Status: t.status,
       "Setoran Terakhir": latestPayment?.approvedAt
-        ? latestPayment.approvedAt.toISOString().split("T")[0]
+        ? new Date(latestPayment.approvedAt).toISOString().split("T")[0]
         : "-",
     };
   });
