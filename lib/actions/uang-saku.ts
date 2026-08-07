@@ -424,7 +424,7 @@ export async function getRiwayatUangSaku(siswaId: string) {
     }),
   ]);
 
-  return { topupList, belanjaList };
+  return JSON.parse(JSON.stringify({ topupList, belanjaList }));
 }
 
 export async function getTopupListForVerification() {
@@ -450,7 +450,7 @@ export async function getTopupListForVerification() {
     orderBy: { createdAt: "asc" },
   });
 
-  return topups;
+  return JSON.parse(JSON.stringify(topups));
 }
 
 // ========== ADMIN FULL CONTROL: TOPUP TUNAI DI MEJA TU ==========
@@ -581,5 +581,5 @@ export async function adminUpdateLimitHarian(siswaId: string, limitHarian: numbe
   revalidatePath("/koperasi/dashboard");
   revalidatePath("/wali/dashboard");
 
-  return updatedSiswa;
+  return JSON.parse(JSON.stringify(updatedSiswa));
 }

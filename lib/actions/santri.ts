@@ -38,7 +38,7 @@ export async function getSantriList() {
     orderBy: { name: "asc" },
   });
 
-  return santriList;
+  return JSON.parse(JSON.stringify(santriList));
 }
 
 export async function getSantriById(id: string) {
@@ -59,7 +59,7 @@ export async function getSantriById(id: string) {
     },
   });
 
-  return santri;
+  return santri ? JSON.parse(JSON.stringify(santri)) : null;
 }
 
 // ========== CREATE ==========
@@ -100,7 +100,7 @@ export async function createSantri(data: {
   });
 
   revalidatePath("/admin/santri");
-  return santri;
+  return JSON.parse(JSON.stringify(santri));
 }
 
 // ========== UPDATE ==========
@@ -145,7 +145,7 @@ export async function updateSantri(
   }
 
   revalidatePath("/admin/santri");
-  return santri;
+  return JSON.parse(JSON.stringify(santri));
 }
 
 // ========== DELETE ==========

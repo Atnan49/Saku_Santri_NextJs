@@ -62,7 +62,7 @@ export async function getTagihanList(filters?: {
     orderBy: { createdAt: "desc" },
   });
 
-  return tagihanList;
+  return JSON.parse(JSON.stringify(tagihanList));
 }
 
 export async function getTagihanById(id: string) {
@@ -85,7 +85,7 @@ export async function getTagihanById(id: string) {
     },
   });
 
-  return tagihan;
+  return tagihan ? JSON.parse(JSON.stringify(tagihan)) : null;
 }
 
 // ========== GENERATE SPP BULANAN OTOMATIS ==========
@@ -384,7 +384,7 @@ export async function updateTagihan(
   });
 
   revalidatePath("/admin/tagihan");
-  return updated;
+  return JSON.parse(JSON.stringify(updated));
 }
 
 // ========== DELETE TAGIHAN ==========
@@ -578,7 +578,7 @@ export async function adminUpdateBill(
   revalidatePath("/admin/dashboard");
   revalidatePath("/wali/dashboard");
 
-  return updatedBill;
+  return JSON.parse(JSON.stringify(updatedBill));
 }
 
 // ========== ADMIN FULL CONTROL: VOID / CANCEL BILL ==========

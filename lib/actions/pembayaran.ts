@@ -487,6 +487,11 @@ export async function bendaharaApproveBulkPayments(pembayaranIds: string[]) {
 // ========== QUERIES untuk Halaman Verifikasi & Approval ==========
 
 export async function getPembayaranForAdminVerification() {
+  const session = await getServerSession(authOptions);
+  if (!session || !["ADMIN", "BENDAHARA"].includes(session.user.role)) {
+    throw new Error("Akses ditolak.");
+  }
+
   const pembayaran = await prisma.pembayaran.findMany({
     where: {
       tagihan: { status: "MENUNGGU_VERIFIKASI_ADMIN" },
@@ -521,10 +526,15 @@ export async function getPembayaranForAdminVerification() {
     }
   }
 
-  return Array.from(latestMap.values());
+  return JSON.parse(JSON.stringify(Array.from(latestMap.values())));
 }
 
 export async function getPembayaranForBendaharaApproval() {
+  const session = await getServerSession(authOptions);
+  if (!session || !["BENDAHARA", "ADMIN"].includes(session.user.role)) {
+    throw new Error("Akses ditolak.");
+  }
+
   const pembayaran = await prisma.pembayaran.findMany({
     where: {
       tagihan: { status: "MENUNGGU_APPROVAL_BENDAHARA" },
@@ -558,7 +568,7 @@ export async function getPembayaranForBendaharaApproval() {
     }
   }
 
-  return Array.from(latestMap.values());
+  return JSON.parse(JSON.stringify(Array.from(latestMap.values())));
 }
 
 // ========== SEARCH & FETCH PAID RECEIPTS (UNTUK CETAK KWITANSI) ==========
