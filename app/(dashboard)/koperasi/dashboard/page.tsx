@@ -65,6 +65,11 @@ export default function KoperasiDashboardPage() {
         setNisn("");
         setTotalBelanja("");
         setCatatanBarang("");
+      } else {
+        setResultAlert({
+          type: "error",
+          message: res.message || "Gagal memproses transaksi.",
+        });
       }
     } catch (err: any) {
       setResultAlert({

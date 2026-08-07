@@ -237,127 +237,156 @@ export async function processTransaksiKoperasi(data: {
   nisn: string;
   totalBelanja: number;
   catatanBarang?: string;
-}) {
-  const session = await getServerSession(authOptions);
-  if (!session || !["KOPERASI", "ADMIN"].includes(session.user.role)) {
-    throw new Error("Akses ditolak. Hanya Kasir Koperasi atau Admin yang dapat memproses transaksi.");
-  }
+}): Promise<{
+  success: boolean;
+  message: string;
+  transaksiId?: string;
+  sisaSaldo?: number;
+  sisaLimit?: number;
+}> {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session || !["KOPERASI", "ADMIN"].includes(session.user.role)) {
+      return {
+        success: false,
+        message: "Akses ditolak. Hanya Kasir Koperasi atau Admin yang dapat memproses transaksi.",
+      };
+    }
 
-  if (data.totalBelanja <= 0) {
-    throw new Error("Total belanja harus lebih dari Rp 0.");
-  }
+    if (!data.totalBelanja || data.totalBelanja <= 0) {
+      return { success: false, message: "Total belanja harus lebih dari Rp 0." };
+    }
 
-  const cleanNisn = data.nisn.trim();
+    const cleanNisn = data.nisn.trim();
+    if (!cleanNisn) {
+      return { success: false, message: "NISN santri tidak boleh kosong." };
+    }
 
-  // Eksekusi seluruh alur validasi & update dalam SATU Interactive Transaction untuk cegah Race Condition
-  return await prisma.$transaction(async (tx) => {
-    // 1. Cari & Kunci data siswa
-    const siswa = await tx.siswa.findUnique({
-      where: { nisn: cleanNisn },
-      include: {
-        kelas: { select: { name: true } },
-        wali: {
-          include: {
-            user: { select: { id: true, phone: true, name: true } },
+    // Eksekusi seluruh alur validasi & update dalam SATU Interactive Transaction untuk cegah Race Condition
+    const result = await prisma.$transaction(async (tx) => {
+      // 1. Cari & Kunci data siswa
+      const siswa = await tx.siswa.findUnique({
+        where: { nisn: cleanNisn },
+        include: {
+          kelas: { select: { name: true } },
+          wali: {
+            include: {
+              user: { select: { id: true, phone: true, name: true } },
+            },
           },
         },
-      },
-    });
+      });
 
-    if (!siswa) {
-      throw new Error(`Siswa dengan NISN "${cleanNisn}" tidak ditemukan.`);
-    }
+      if (!siswa) {
+        return {
+          success: false,
+          message: `Siswa dengan NISN "${cleanNisn}" tidak ditemukan.`,
+        };
+      }
 
-    const currentSaldo = Number(siswa.saldoSaku);
-    const limitHarian = Number(siswa.limitHarian);
+      const currentSaldo = Number(siswa.saldoSaku);
+      const limitHarian = Number(siswa.limitHarian);
 
-    // 2. Validasi Saldo Cukup
-    if (currentSaldo < data.totalBelanja) {
-      throw new Error(
-        `Saldo saku ${siswa.name} tidak mencukupi (Saldo: ${formatIDR(currentSaldo)}, Belanja: ${formatIDR(data.totalBelanja)}).`
-      );
-    }
+      // 2. Validasi Saldo Cukup
+      if (currentSaldo < data.totalBelanja) {
+        return {
+          success: false,
+          message: `Saldo saku ${siswa.name} tidak mencukupi (Saldo: ${formatIDR(currentSaldo)}, Belanja: ${formatIDR(data.totalBelanja)}).`,
+        };
+      }
 
-    // 3. Validasi Limit Harian Jajan
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
+      // 3. Validasi Limit Harian Jajan
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
 
-    const todayEnd = new Date();
-    todayEnd.setHours(23, 59, 59, 999);
+      const todayEnd = new Date();
+      todayEnd.setHours(23, 59, 59, 999);
 
-    const todayPurchases = await tx.transaksiKoperasi.aggregate({
-      _sum: { totalBelanja: true },
-      where: {
-        siswaId: siswa.id,
-        createdAt: {
-          gte: todayStart,
-          lte: todayEnd,
+      const todayPurchases = await tx.transaksiKoperasi.aggregate({
+        _sum: { totalBelanja: true },
+        where: {
+          siswaId: siswa.id,
+          createdAt: {
+            gte: todayStart,
+            lte: todayEnd,
+          },
         },
-      },
+      });
+
+      const spentToday = todayPurchases._sum.totalBelanja
+        ? Number(todayPurchases._sum.totalBelanja)
+        : 0;
+
+      if (spentToday + data.totalBelanja > limitHarian) {
+        const remainingLimit = Math.max(0, limitHarian - spentToday);
+        return {
+          success: false,
+          message: `Transaksi ditolak! Belanja melebihi limit harian ${siswa.name}.\nLimit Harian: ${formatIDR(limitHarian)}\nSudah Belanja Hari Ini: ${formatIDR(spentToday)}\nSisa Limit Hari Ini: ${formatIDR(remainingLimit)}`,
+        };
+      }
+
+      // 4. Catat Transaksi Koperasi
+      const transaksi = await tx.transaksiKoperasi.create({
+        data: {
+          siswaId: siswa.id,
+          kasirId: session.user.id,
+          totalBelanja: data.totalBelanja,
+          catatanBarang: data.catatanBarang || null,
+        },
+      });
+
+      // 5. Potong Saldo Siswa
+      const updatedSiswa = await tx.siswa.update({
+        where: { id: siswa.id },
+        data: {
+          saldoSaku: { decrement: data.totalBelanja },
+        },
+      });
+
+      const newSaldo = Number(updatedSiswa.saldoSaku);
+      const sisaLimit = limitHarian - (spentToday + data.totalBelanja);
+      const waliUserId = siswa.wali?.user?.id;
+      const waliPhone = siswa.wali?.user?.phone;
+      const totalBelanjaFormat = formatIDR(data.totalBelanja);
+
+      // Notifikasi in-app ke Wali (async)
+      if (waliUserId) {
+        createNotification(
+          waliUserId,
+          "Transaksi Koperasi Sekolah 🛒",
+          `${siswa.name} telah berbelanja ${totalBelanjaFormat} di Koperasi (${data.catatanBarang || "Barang Koperasi"}). Sisa saldo: ${formatIDR(newSaldo)}.`
+        ).catch((err) => console.error("Gagal buat notifikasi:", err));
+      }
+
+      // Kirim WA Notifikasi ke Wali (async)
+      if (waliPhone) {
+        const itemsText = data.catatanBarang ? `\nBarang: ${data.catatanBarang}` : "";
+        sendWhatsAppMessage({
+          targetPhone: waliPhone,
+          message: `🛒 Transaksi Koperasi / Mart Sekolah\n\nSantri: ${siswa.name} (${siswa.kelas?.name || ""})\nTotal Belanja: ${totalBelanjaFormat}${itemsText}\n\nSisa Saldo Saku: ${formatIDR(newSaldo)}\nSisa Limit Hari Ini: ${formatIDR(sisaLimit)}\n\nTerima kasih. 🙏`,
+        }).catch((err) => console.error("Gagal kirim WA:", err));
+      }
+
+      revalidatePath("/koperasi/dashboard");
+      revalidatePath("/wali/dashboard");
+
+      return {
+        success: true,
+        message: `Transaksi belanja ${siswa.name} sebesar ${totalBelanjaFormat} berhasil diproses.`,
+        transaksiId: transaksi.id,
+        sisaSaldo: newSaldo,
+        sisaLimit,
+      };
     });
 
-    const spentToday = todayPurchases._sum.totalBelanja
-      ? Number(todayPurchases._sum.totalBelanja)
-      : 0;
-
-    if (spentToday + data.totalBelanja > limitHarian) {
-      const remainingLimit = Math.max(0, limitHarian - spentToday);
-      throw new Error(
-        `Transaksi ditolak! Belanja melebihi limit harian ${siswa.name}.\nLimit Harian: ${formatIDR(limitHarian)}\nSudah Belanja Hari Ini: ${formatIDR(spentToday)}\nSisa Limit Hari Ini: ${formatIDR(remainingLimit)}`
-      );
-    }
-
-    // 4. Catat Transaksi Koperasi
-    const transaksi = await tx.transaksiKoperasi.create({
-      data: {
-        siswaId: siswa.id,
-        kasirId: session.user.id,
-        totalBelanja: data.totalBelanja,
-        catatanBarang: data.catatanBarang || null,
-      },
-    });
-
-    // 5. Potong Saldo Siswa
-    const updatedSiswa = await tx.siswa.update({
-      where: { id: siswa.id },
-      data: {
-        saldoSaku: { decrement: data.totalBelanja },
-      },
-    });
-
-    const newSaldo = Number(updatedSiswa.saldoSaku);
-    const sisaLimit = limitHarian - (spentToday + data.totalBelanja);
-    const waliUserId = siswa.wali.user.id;
-    const waliPhone = siswa.wali.user.phone;
-    const totalBelanjaFormat = formatIDR(data.totalBelanja);
-
-    // Notifikasi in-app ke Wali (async)
-    createNotification(
-      waliUserId,
-      "Transaksi Koperasi Sekolah 🛒",
-      `${siswa.name} telah berbelanja ${totalBelanjaFormat} di Koperasi (${data.catatanBarang || "Barang Koperasi"}). Sisa saldo: ${formatIDR(newSaldo)}.`
-    ).catch((err) => console.error("Gagal buat notifikasi:", err));
-
-    // Kirim WA Notifikasi ke Wali (async)
-    if (waliPhone) {
-      const itemsText = data.catatanBarang ? `\nBarang: ${data.catatanBarang}` : "";
-      sendWhatsAppMessage({
-        targetPhone: waliPhone,
-        message: `🛒 Transaksi Koperasi / Mart Sekolah\n\nSantri: ${siswa.name} (${siswa.kelas.name})\nTotal Belanja: ${totalBelanjaFormat}${itemsText}\n\nSisa Saldo Saku: ${formatIDR(newSaldo)}\nSisa Limit Hari Ini: ${formatIDR(sisaLimit)}\n\nTerima kasih. 🙏`,
-      }).catch((err) => console.error("Gagal kirim WA:", err));
-    }
-
-    revalidatePath("/koperasi/dashboard");
-    revalidatePath("/wali/dashboard");
-
+    return result;
+  } catch (err: any) {
+    console.error("Error processTransaksiKoperasi:", err);
     return {
-      success: true,
-      message: `Transaksi belanja ${siswa.name} sebesar ${totalBelanjaFormat} berhasil diproses.`,
-      transaksi,
-      sisaSaldo: newSaldo,
-      sisaLimit,
+      success: false,
+      message: err.message || "Terjadi kesalahan pada server saat memproses transaksi.",
     };
-  });
+  }
 }
 
 // ========== QUERIES RIWAYAT UANG SAKU & TOPUP ==========
