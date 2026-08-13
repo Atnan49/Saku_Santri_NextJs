@@ -13,13 +13,7 @@ import { authOptions } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import bcrypt from "bcrypt";
 
-async function requireAdmin() {
-  const session = await getServerSession(authOptions);
-  if (!session || session.user.role !== "ADMIN") {
-    throw new Error("Akses ditolak. Hanya ADMIN yang dapat melakukan operasi ini.");
-  }
-  return session;
-}
+import { requireAdmin } from "@/lib/auth-helpers";
 
 export async function getUserList() {
   const users = await prisma.user.findMany({

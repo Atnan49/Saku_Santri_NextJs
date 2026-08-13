@@ -494,18 +494,18 @@ export async function adminTopUpCash(data: {
     });
 
     // Buat Topup Record
-    const topup = await (tx as any).topupSaku.create({
+    const topup = await tx.topupSaku.create({
       data: {
         siswaId: data.siswaId,
         nominal: data.nominal,
         buktiUrl: "/uploads/topup_cash_tu.png",
         status: "BERHASIL",
-        catatan: data.catatan || "Top-up Tunai di Kasir Meja TU.",
+        catatanAdmin: data.catatan || "Top-up Tunai di Kasir Meja TU.",
       },
     });
 
     // Catat AuditLog
-    await (tx as any).auditLog.create({
+    await tx.auditLog.create({
       data: {
         userId: session.user.id,
         action: "TOPUP_CASH_TU",

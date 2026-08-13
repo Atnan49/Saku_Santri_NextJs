@@ -12,7 +12,7 @@
 
 import React from "react";
 import type { Metadata } from "next";
-import "./globals.css"; // Usva akan mengelola styling global di file ini
+import "./globals.css";
 import NextAuthProvider from "@/components/providers/NextAuthProvider";
 
 export const metadata: Metadata = {

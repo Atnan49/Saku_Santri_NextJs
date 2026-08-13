@@ -40,6 +40,9 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# local draft articles
+# local draft articles & task tracking
 ARTIKEL_ILMIAH_SINTA5.md
+DAFTAR_TUGAS.md
+images/
+
 

@@ -12,14 +12,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 
-// Helper: Pastikan user adalah ADMIN
-async function requireAdmin() {
-  const session = await getServerSession(authOptions);
-  if (!session || session.user.role !== "ADMIN") {
-    throw new Error("Akses ditolak. Hanya ADMIN yang dapat melakukan operasi ini.");
-  }
-  return session;
-}
+import { requireAdmin } from "@/lib/auth-helpers";
 
 // ========== READ ==========
 

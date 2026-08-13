@@ -37,7 +37,7 @@ export default withAuth(
     callbacks: {
       authorized: ({ token }) => !!token, // Mengizinkan middleware berjalan hanya jika user terautentikasi
     },
-    secret: process.env.NEXTAUTH_SECRET || "saku-santri-secure-production-secret-key-32chars-min!",
+    secret: process.env.NEXTAUTH_SECRET,
   }
 );
 

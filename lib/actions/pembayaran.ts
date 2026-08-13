@@ -312,49 +312,63 @@ export async function bendaharaApprovePayment(data: {
   const jenisName = tagihan.jenisTagihan.name;
 
   if (data.action === "approve") {
-    const disetor = Number(pembayaran.nominalDisetor);
-    const prevTerbayar = Number(tagihan.nominalTerbayar || 0);
-    const nominalAkhir = Number(tagihan.nominalAkhir);
-    const newTerbayar = prevTerbayar + disetor;
+    const { isFullyPaid, setoranFormat, nominalAkhir, newTerbayar } = await prisma.$transaction(async (tx) => {
+      const currentPembayaran = await tx.pembayaran.findUnique({
+        where: { id: data.pembayaranId },
+        include: { tagihan: true },
+      });
 
-    const isFullyPaid = newTerbayar >= nominalAkhir;
-    const finalStatus = isFullyPaid ? "LUNAS" : "DIBAYAR_SEBAGIAN";
+      if (!currentPembayaran || currentPembayaran.approvedAt) {
+        throw new Error("Pembayaran sudah diproses atau tidak ditemukan.");
+      }
 
-    // Approve final
-    await (prisma as any).pembayaran.update({
-      where: { id: data.pembayaranId },
-      data: {
-        approvedAt: new Date(),
-        approvedByUserId: session.user.id,
-        catatanBendahara: data.catatan || "Disetujui oleh Bendahara.",
-      },
+      const disetor = Number(currentPembayaran.nominalDisetor);
+      const prevTerbayar = Number(currentPembayaran.tagihan.nominalTerbayar || 0);
+      const nominalAkhirVal = Number(currentPembayaran.tagihan.nominalAkhir);
+      const newTerbayarVal = prevTerbayar + disetor;
+
+      const isPaid = newTerbayarVal >= nominalAkhirVal;
+      const finalStatus = isPaid ? "LUNAS" : "DIBAYAR_SEBAGIAN";
+
+      await tx.pembayaran.update({
+        where: { id: data.pembayaranId },
+        data: {
+          approvedAt: new Date(),
+          approvedByUserId: session.user.id,
+          catatanBendahara: data.catatan || "Disetujui oleh Bendahara.",
+        },
+      });
+
+      await tx.tagihan.update({
+        where: { id: currentPembayaran.tagihanId },
+        data: {
+          nominalTerbayar: newTerbayarVal,
+          status: finalStatus,
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          userId: session.user.id,
+          action: "APPROVE_PAYMENT_BENDAHARA",
+          entityType: "Pembayaran",
+          entityId: currentPembayaran.id,
+          details: JSON.stringify({
+            tagihanId: currentPembayaran.tagihanId,
+            disetor,
+            totalTerbayar: newTerbayarVal,
+            finalStatus,
+          }),
+        },
+      });
+
+      return {
+        isFullyPaid: isPaid,
+        setoranFormat: formatIDR(disetor),
+        nominalAkhir: nominalAkhirVal,
+        newTerbayar: newTerbayarVal,
+      };
     });
-
-    await (prisma as any).tagihan.update({
-      where: { id: tagihan.id },
-      data: {
-        nominalTerbayar: newTerbayar,
-        status: finalStatus,
-      },
-    });
-
-    // AuditLog
-    await (prisma as any).auditLog.create({
-      data: {
-        userId: session.user.id,
-        action: "APPROVE_PAYMENT_BENDAHARA",
-        entityType: "Pembayaran",
-        entityId: pembayaran.id,
-        details: JSON.stringify({
-          tagihanId: tagihan.id,
-          disetor,
-          totalTerbayar: newTerbayar,
-          finalStatus,
-        }),
-      },
-    });
-
-    const setoranFormat = formatIDR(disetor);
 
     // Notifikasi ke Wali
     await createNotification(
@@ -579,8 +593,9 @@ export async function searchKwitansi(query?: string) {
     throw new Error("Anda harus login untuk mencari kwitansi.");
   }
 
-  const rawList = await (prisma as any).pembayaran.findMany({
+  const rawList = await prisma.pembayaran.findMany({
     where: {
+      approvedAt: { not: null },
       tagihan: {
         status: "LUNAS",
       },

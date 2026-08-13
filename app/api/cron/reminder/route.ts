@@ -15,8 +15,8 @@ import { formatIDR } from "@/lib/utils";
 export async function GET(request: Request) {
   try {
     const authHeader = request.headers.get("authorization");
-    // Verify CRON_SECRET if configured
-    if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    // Verify CRON_SECRET mandatory authorization
+    if (!process.env.CRON_SECRET || authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
       return NextResponse.json({ error: "Unauthorized cron trigger." }, { status: 401 });
     }
 

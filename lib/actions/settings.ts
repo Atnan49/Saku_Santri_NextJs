@@ -11,13 +11,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 
-async function requireAdmin() {
-  const session = await getServerSession(authOptions);
-  if (!session || session.user.role !== "ADMIN") {
-    throw new Error("Akses ditolak. Hanya ADMIN yang dapat mengelola pengaturan.");
-  }
-  return session;
-}
+import { requireAdmin } from "@/lib/auth-helpers";
 
 export async function getInstitutionSettings() {
   const settings = await (prisma as any).institutionSettings.findMany();

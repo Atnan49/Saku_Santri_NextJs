@@ -92,6 +92,9 @@ model Tagihan {
   pembayaran     Pembayaran[]
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
+
+  @@index([siswaId, status])
+  @@index([jenisTagihanId, tahunAjaranId, period])
 }
 
 model Pembayaran {
@@ -111,6 +114,9 @@ model Pembayaran {
   approvedByUser   User?     @relation("ApprovedPayments", fields: [approvedByUserId], references: [id])
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
+
+  @@index([tagihanId])
+  @@index([approvedAt])
 }
 
 model TopupSaku {
@@ -125,6 +131,8 @@ model TopupSaku {
   verifiedAt   DateTime?
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
+
+  @@index([siswaId, status])
 }
 
 model TransaksiKoperasi {
@@ -136,6 +144,8 @@ model TransaksiKoperasi {
   totalBelanja  Decimal
   catatanBarang String?
   createdAt     DateTime @default(now())
+
+  @@index([siswaId, createdAt])
 }
 
 model Notification {
@@ -146,6 +156,8 @@ model Notification {
   message   String
   isRead    Boolean  @default(false)
   createdAt DateTime @default(now())
+
+  @@index([userId, isRead])
 }
 
 model InstitutionSettings {

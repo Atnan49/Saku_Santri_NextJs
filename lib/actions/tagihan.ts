@@ -15,13 +15,7 @@ import { revalidatePath } from "next/cache";
 import { notifyByRole, createNotification } from "./notification";
 import { sendWhatsAppMessage } from "@/lib/whatsapp";
 
-async function requireAdmin() {
-  const session = await getServerSession(authOptions);
-  if (!session || session.user.role !== "ADMIN") {
-    throw new Error("Akses ditolak. Hanya ADMIN yang dapat melakukan operasi ini.");
-  }
-  return session;
-}
+import { requireAdmin } from "@/lib/auth-helpers";
 
 // ========== READ ==========
 
@@ -175,7 +169,7 @@ export async function generateMonthlyBills(data: {
       nominalAwal: nominalAwalNum,
       potongan: potonganNum,
       nominalAkhir: nominalAkhirNum,
-      nominalTerbayar: autoLunas ? nominalAwalNum : 0,
+      nominalTerbayar: 0,
       dueDate,
       period: data.period,
       status: autoLunas ? ("LUNAS" as const) : ("BELUM_BAYAR" as const),
@@ -313,7 +307,7 @@ export async function createManualBill(data: {
       nominalAwal: nominalAwalNum,
       potongan: potonganNum,
       nominalAkhir: nominalAkhirNum,
-      nominalTerbayar: autoLunas ? nominalAwalNum : 0,
+      nominalTerbayar: 0,
       dueDate,
       period: data.period || "",
       catatanTagihan: data.catatanTagihan || null,

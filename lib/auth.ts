@@ -132,6 +132,6 @@ export const authOptions: AuthOptions = {
     maxAge: 24 * 60 * 60, // 24 jam
   },
 
-  secret: process.env.NEXTAUTH_SECRET || "saku-santri-secure-production-secret-key-32chars-min!",
+  secret: process.env.NEXTAUTH_SECRET,
 };
 
