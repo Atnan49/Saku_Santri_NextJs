@@ -6,6 +6,7 @@ import TopHeader from "@/components/ui/TopHeader";
 import DigitalReceiptModal, { DigitalReceiptData } from "@/components/ui/DigitalReceiptModal";
 import { formatIDR } from "@/lib/utils";
 import { getPembayaranForAdminVerification, adminVerifyPayment } from "@/lib/actions/pembayaran";
+import { getTopupSakuForAdminVerification, verifyTopupSaku } from "@/lib/actions/uang-saku";
 import {
   CheckCircle2,
   Search,
@@ -38,6 +39,7 @@ interface VerificationItem {
 }
 
 export default function AdminVerifikasiPage() {
+  const [activeTab, setActiveTab] = useState<"TAGIHAN" | "TOPUP">("TAGIHAN");
   const [loading, setLoading] = useState(true);
   const [queueList, setQueueList] = useState<Array<VerificationItem>>([]);
 
@@ -59,27 +61,56 @@ export default function AdminVerifikasiPage() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const raw = await getPembayaranForAdminVerification();
-      const mapped: VerificationItem[] = raw.map((p: any) => ({
-        id: p.id,
-        refNo: `REF-${p.id.slice(-6).toUpperCase()}`,
-        reportDate: new Date(p.createdAt).toISOString().split("T")[0],
-        studentName: p.tagihan?.siswa?.name || "Santri",
-        studentClass: p.tagihan?.siswa?.kelas?.name || "-",
-        parentName: p.tagihan?.siswa?.wali?.user?.name || "Wali Santri",
-        category: p.tagihan?.jenisTagihan?.name || "SPP Bulanan",
-        dateTimeStr: new Date(p.createdAt).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" }),
-        originalAmount: Number(p.tagihan?.nominalAwal) || 0,
-        expectedAmount: Number(p.tagihan?.nominalAkhir) || 0,
-        reportedAmount: Number(p.tagihan?.nominalAkhir) || 0,
-        hasScholarship: Number(p.tagihan?.potongan) > 0,
-        paymentMethod: p.catatanWali || "Bank Transfer",
-        proofImageUrl: p.buktiUrl || "",
-        status: p.tagihan?.status === "LUNAS" ? "LUNAS" : p.tagihan?.status?.includes("DITOLAK") ? "DITOLAK" : "PENDING",
-      }));
-      setQueueList(mapped);
-      if (mapped.length > 0 && !selectedId) {
-        setSelectedId(mapped[0].id);
+      if (activeTab === "TAGIHAN") {
+        const raw = await getPembayaranForAdminVerification();
+        const mapped: VerificationItem[] = raw.map((p: any) => ({
+          id: p.id,
+          refNo: `REF-${p.id.slice(-6).toUpperCase()}`,
+          reportDate: new Date(p.createdAt).toISOString().split("T")[0],
+          studentName: p.tagihan?.siswa?.name || "Santri",
+          studentClass: p.tagihan?.siswa?.kelas?.name || "-",
+          parentName: p.tagihan?.siswa?.wali?.user?.name || "Wali Santri",
+          category: p.tagihan?.jenisTagihan?.name || "SPP Bulanan",
+          dateTimeStr: new Date(p.createdAt).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" }),
+          originalAmount: Number(p.tagihan?.nominalAwal) || 0,
+          expectedAmount: Number(p.tagihan?.nominalAkhir) || 0,
+          reportedAmount: Number(p.tagihan?.nominalAkhir) || 0,
+          hasScholarship: Number(p.tagihan?.potongan) > 0,
+          paymentMethod: p.catatanWali || "Bank Transfer",
+          proofImageUrl: p.buktiUrl || "",
+          status: p.tagihan?.status === "LUNAS" ? "LUNAS" : p.tagihan?.status?.includes("DITOLAK") ? "DITOLAK" : "PENDING",
+        }));
+        setQueueList(mapped);
+        if (mapped.length > 0 && (!selectedId || !mapped.find(m => m.id === selectedId))) {
+          setSelectedId(mapped[0].id);
+        } else if (mapped.length === 0) {
+          setSelectedId("");
+        }
+      } else {
+        const raw = await getTopupSakuForAdminVerification();
+        const mapped: VerificationItem[] = raw.map((t: any) => ({
+          id: t.id,
+          refNo: `TUP-${t.id.slice(-6).toUpperCase()}`,
+          reportDate: new Date(t.createdAt).toISOString().split("T")[0],
+          studentName: t.siswa?.name || "Santri",
+          studentClass: t.siswa?.kelas?.name || "-",
+          parentName: t.siswa?.wali?.user?.name || "Wali Santri",
+          category: "Top-up Saku",
+          dateTimeStr: new Date(t.createdAt).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" }),
+          originalAmount: Number(t.nominal) || 0,
+          expectedAmount: Number(t.nominal) || 0,
+          reportedAmount: Number(t.nominal) || 0,
+          hasScholarship: false,
+          paymentMethod: "Bank Transfer",
+          proofImageUrl: t.buktiUrl || "",
+          status: "PENDING", // always pending from this query
+        }));
+        setQueueList(mapped);
+        if (mapped.length > 0 && (!selectedId || !mapped.find(m => m.id === selectedId))) {
+          setSelectedId(mapped[0].id);
+        } else if (mapped.length === 0) {
+          setSelectedId("");
+        }
       }
     } catch (err) {
       console.error("Gagal memuat verifikasi admin:", err);
@@ -90,7 +121,7 @@ export default function AdminVerifikasiPage() {
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [activeTab]);
 
   const selectedItem = queueList.find((q) => q.id === selectedId) || queueList[0];
 
@@ -108,22 +139,28 @@ export default function AdminVerifikasiPage() {
   const handleApprove = async () => {
     if (!selectedItem) return;
     try {
-      await adminVerifyPayment({ pembayaranId: selectedItem.id, action: "approve" });
+      if (activeTab === "TAGIHAN") {
+        await adminVerifyPayment({ pembayaranId: selectedItem.id, action: "approve" });
 
-      const receiptData: DigitalReceiptData = {
-        receiptNo: `KW-${selectedItem.refNo.replace("REF-", "")}`,
-        date: new Date().toISOString().split("T")[0],
-        receivedFrom: selectedItem.parentName,
-        studentName: selectedItem.studentName,
-        studentClass: selectedItem.studentClass,
-        amount: selectedItem.reportedAmount,
-        paymentFor: selectedItem.category,
-        verifiedBy: "Admin Utama",
-        paymentMethod: selectedItem.paymentMethod,
-      };
+        const receiptData: DigitalReceiptData = {
+          receiptNo: `KW-${selectedItem.refNo.replace("REF-", "")}`,
+          date: new Date().toISOString().split("T")[0],
+          receivedFrom: selectedItem.parentName,
+          studentName: selectedItem.studentName,
+          studentClass: selectedItem.studentClass,
+          amount: selectedItem.reportedAmount,
+          paymentFor: selectedItem.category,
+          verifiedBy: "Admin Utama",
+          paymentMethod: selectedItem.paymentMethod,
+        };
 
-      setGeneratedReceiptData(receiptData);
-      setReceiptModalOpen(true);
+        setGeneratedReceiptData(receiptData);
+        setReceiptModalOpen(true);
+      } else {
+        await verifyTopupSaku({ topupId: selectedItem.id, action: "approve" });
+        alert("Top-up saku berhasil disetujui!");
+        loadData();
+      }
     } catch (err: any) {
       alert(err.message || "Gagal memverifikasi pembayaran.");
     }
@@ -141,11 +178,19 @@ export default function AdminVerifikasiPage() {
     }
 
     try {
-      await adminVerifyPayment({
-        pembayaranId: selectedItem.id,
-        action: "reject",
-        catatan: rejectionReason.trim(),
-      });
+      if (activeTab === "TAGIHAN") {
+        await adminVerifyPayment({
+          pembayaranId: selectedItem.id,
+          action: "reject",
+          catatan: rejectionReason.trim(),
+        });
+      } else {
+        await verifyTopupSaku({
+          topupId: selectedItem.id,
+          action: "reject",
+          catatan: rejectionReason.trim(),
+        });
+      }
       setRejectionModalOpen(false);
       setRejectionReason("");
       await loadData();
@@ -168,11 +213,48 @@ export default function AdminVerifikasiPage() {
                 MODUL VERIFIKASI
               </div>
               <h1 style={{ fontSize: "1.75rem", fontWeight: 800, color: "var(--text-main)", marginTop: "0.2rem" }}>
-                Antrean Pembayaran
+                Antrean {activeTab === "TAGIHAN" ? "Pembayaran Tagihan" : "Top-up Saku"}
               </h1>
             </div>
 
             <div style={{ display: "flex", alignItems: "center", gap: "2rem" }}>
+              <div style={{ display: "flex", gap: "0.5rem", padding: "0.25rem", backgroundColor: "rgba(255,255,255,0.05)", borderRadius: "8px" }}>
+                <button
+                  onClick={() => setActiveTab("TAGIHAN")}
+                  data-testid="tab-tagihan"
+                  style={{
+                    padding: "0.5rem 1rem",
+                    borderRadius: "6px",
+                    border: "none",
+                    fontWeight: 700,
+                    fontSize: "0.85rem",
+                    cursor: "pointer",
+                    backgroundColor: activeTab === "TAGIHAN" ? "var(--primary)" : "transparent",
+                    color: activeTab === "TAGIHAN" ? "#fff" : "var(--text-muted)",
+                    transition: "all 0.2s"
+                  }}
+                >
+                  SPP & Kegiatan
+                </button>
+                <button
+                  onClick={() => setActiveTab("TOPUP")}
+                  data-testid="tab-topup"
+                  style={{
+                    padding: "0.5rem 1rem",
+                    borderRadius: "6px",
+                    border: "none",
+                    fontWeight: 700,
+                    fontSize: "0.85rem",
+                    cursor: "pointer",
+                    backgroundColor: activeTab === "TOPUP" ? "var(--primary)" : "transparent",
+                    color: activeTab === "TOPUP" ? "#fff" : "var(--text-muted)",
+                    transition: "all 0.2s"
+                  }}
+                >
+                  Top-up Saku
+                </button>
+              </div>
+
               <div style={{ textAlign: "right" }}>
                 <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--text-muted)" }}>Menunggu Verifikasi</div>
                 <div style={{ fontSize: "1.25rem", fontWeight: 800, color: "var(--text-main)" }}>
@@ -196,6 +278,7 @@ export default function AdminVerifikasiPage() {
                 <Search size={16} style={{ position: "absolute", left: "0.75rem", color: "var(--text-muted)" }} />
                 <input
                   type="text"
+                  data-testid="search-verifikasi"
                   placeholder="Cari No. Referensi atau Nama..."
                   style={{
                     width: "100%",
@@ -221,6 +304,7 @@ export default function AdminVerifikasiPage() {
                     return (
                       <div
                         key={item.id}
+                        data-testid={`queue-item-${item.studentName.toLowerCase().replace(/\s+/g, '-')}`}
                         onClick={() => setSelectedId(item.id)}
                         style={{
                           padding: "1rem",
@@ -498,6 +582,7 @@ export default function AdminVerifikasiPage() {
                 <div style={{ display: "flex", gap: "1rem", paddingTop: "0.5rem" }}>
                   <button
                     onClick={handleApprove}
+                    data-testid="approve-verifikasi-button"
                     disabled={selectedItem.status === "LUNAS"}
                     style={{
                       flex: 2,
@@ -522,6 +607,7 @@ export default function AdminVerifikasiPage() {
 
                   <button
                     onClick={() => setRejectionModalOpen(true)}
+                    data-testid="reject-verifikasi-button"
                     disabled={selectedItem.status === "LUNAS" || selectedItem.status === "DITOLAK"}
                     style={{
                       flex: 1,
@@ -616,6 +702,7 @@ export default function AdminVerifikasiPage() {
               </p>
 
               <textarea
+                data-testid="rejection-reason-input"
                 style={{
                   width: "100%",
                   padding: "0.6rem 0.85rem",
@@ -650,6 +737,7 @@ export default function AdminVerifikasiPage() {
                   Batal
                 </button>
                 <button
+                  data-testid="confirm-reject-button"
                   style={{
                     padding: "0.6rem 1.25rem",
                     fontSize: "0.85rem",

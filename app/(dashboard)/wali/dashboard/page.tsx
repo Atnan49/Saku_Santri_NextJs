@@ -12,6 +12,7 @@ import { getWaliDashboardData } from "@/lib/actions/laporan";
 import { submitPaymentProof } from "@/lib/actions/pembayaran";
 import { submitTopupSaku, updateLimitHarian } from "@/lib/actions/uang-saku";
 import { getInstitutionSettings } from "@/lib/actions/settings";
+import { getActiveTahunAjaran } from "@/lib/actions/tahun-ajaran";
 import { convertImageToWebP } from "@/lib/image-converter";
 import {
   Users,
@@ -41,12 +42,14 @@ interface TagihanItem {
   nominalTerbayar: number;
   status: string;
   dueDate: string;
+  tahunAjaran: string;
 }
 
 export default function WaliDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [waliData, setWaliData] = useState<any>(null);
   const [bankSettings, setBankSettings] = useState<any>(null);
+  const [activeTahun, setActiveTahun] = useState<any>(null);
   const [transactionType, setTransactionType] = useState<"TAGIHAN" | "TOPUP">("TAGIHAN");
   const [selectedSiswaId, setSelectedSiswaId] = useState<string>("");
   const [topupNominal, setTopupNominal] = useState<string>("");
@@ -102,12 +105,14 @@ export default function WaliDashboardPage() {
   useEffect(() => {
     async function loadData() {
       try {
-        const [wali, settings]: [any, any] = await Promise.all([
+        const [wali, settings, tahun]: [any, any, any] = await Promise.all([
           getWaliDashboardData(),
           getInstitutionSettings(),
+          getActiveTahunAjaran(),
         ]);
         setWaliData(wali);
         setBankSettings(settings);
+        setActiveTahun(tahun);
 
         if (wali && wali.siswa && wali.siswa.length > 0) {
           setSelectedSiswaId(wali.siswa[0].id);
@@ -119,6 +124,7 @@ export default function WaliDashboardPage() {
             allBills.push({
               id: bill.id,
               periode: bill.period || "Tagihan Santri",
+              tahunAjaran: bill.tahunAjaran?.year || "",
               anak: student.name,
               keterangan: bill.jenisTagihan?.name || "Tagihan Sekolah",
               nominal: Number(bill.nominalAkhir || 0),
@@ -360,7 +366,7 @@ export default function WaliDashboardPage() {
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
                   <h2 style={{ fontSize: "1.15rem", fontWeight: 800, color: "var(--text-main)" }}>Buku Besar Tagihan</h2>
                   <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.78rem", fontWeight: 700, color: "var(--text-muted)" }}>
-                    <span>TAHUN AJARAN 2023/2024</span>
+                    <span>TAHUN AJARAN {activeTahun?.year || "AKTIF"}</span>
                     <Printer size={16} style={{ cursor: "pointer" }} />
                   </div>
                 </div>
@@ -397,6 +403,7 @@ export default function WaliDashboardPage() {
                               <td style={{ padding: "0.9rem 1rem", textAlign: "center" }}>
                                 <input
                                   type="checkbox"
+                                  data-testid={`checkbox-tagihan-${item.keterangan.toLowerCase().replace(/\s+/g, '-')}`}
                                   checked={isChecked}
                                   disabled={item.status === "LUNAS" || item.status.includes("MENUNGGU")}
                                   onChange={() => handleToggleSelect(item.id)}
@@ -496,6 +503,7 @@ export default function WaliDashboardPage() {
                           <label style={{ fontSize: "0.78rem", fontWeight: 700, color: "var(--text-muted)" }}>Pilih Santri</label>
                           <select
                             value={selectedSiswaId}
+                            data-testid="select-siswa-topup"
                             onChange={(e) => setSelectedSiswaId(e.target.value)}
                             style={{
                               width: "100%",
@@ -520,6 +528,7 @@ export default function WaliDashboardPage() {
                           <label style={{ fontSize: "0.78rem", fontWeight: 700, color: "var(--text-muted)" }}>Nominal Top Up Saku (Rp)</label>
                           <input
                             type="number"
+                            data-testid="input-topup-nominal"
                             min="10000"
                             placeholder="Contoh: 50000"
                             value={topupNominal}
@@ -569,6 +578,7 @@ export default function WaliDashboardPage() {
                         <label style={{ fontSize: "0.78rem", fontWeight: 700, color: "var(--text-muted)" }}>Nomor Referensi Bank</label>
                         <input
                           type="text"
+                          data-testid="input-ref-number"
                           placeholder="Cth: TRF-8819-2023"
                           value={refNumber}
                           onChange={(e) => setRefNumber(e.target.value)}
@@ -587,6 +597,7 @@ export default function WaliDashboardPage() {
                         <label style={{ fontSize: "0.78rem", fontWeight: 700, color: "var(--text-muted)" }}>Tanggal Transfer</label>
                         <input
                           type="date"
+                          data-testid="input-transfer-date"
                           value={transferDate}
                           onChange={(e) => setTransferDate(e.target.value)}
                           required
@@ -605,6 +616,7 @@ export default function WaliDashboardPage() {
                     <div className="dropzone" onClick={() => document.getElementById("proof-file-input")?.click()} style={{ cursor: "pointer", border: "2px dashed var(--border-glass)", padding: "1.5rem", borderRadius: "8px", backgroundColor: "rgba(255,255,255,0.01)", textAlign: "center" }}>
                       <input
                         id="proof-file-input"
+                        data-testid="proof-file-input"
                         type="file"
                         accept="image/jpeg,image/png,application/pdf"
                         style={{ display: "none" }}
@@ -638,6 +650,7 @@ export default function WaliDashboardPage() {
                     <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "0.5rem" }}>
                       <button
                         type="submit"
+                        data-testid="submit-payment-proof"
                         disabled={isSubmitting || uploadSuccess}
                         style={{
                           padding: "0.65rem 1.4rem",

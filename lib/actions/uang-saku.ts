@@ -71,6 +71,34 @@ export async function submitTopupSaku(data: {
   return { success: true, message: "Pengajuan topup uang saku berhasil dikirim.", topupId: topup.id };
 }
 
+// ========== ADMIN / BENDAHARA: Get Pending Topup Saku ==========
+
+export async function getTopupSakuForAdminVerification() {
+  const session = await getServerSession(authOptions);
+  if (!session || !["ADMIN", "BENDAHARA"].includes(session.user.role)) {
+    throw new Error("Akses ditolak. Hanya Admin atau Bendahara yang dapat melihat data ini.");
+  }
+
+  const list = await prisma.topupSaku.findMany({
+    where: { status: "MENUNGGU_VERIFIKASI" },
+    include: {
+      siswa: {
+        include: {
+          kelas: { select: { name: true } },
+          wali: {
+            include: {
+              user: { select: { name: true } },
+            },
+          },
+        },
+      },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  return JSON.parse(JSON.stringify(list));
+}
+
 // ========== ADMIN / BENDAHARA: Verifikasi Topup Saku ==========
 
 export async function verifyTopupSaku(data: {

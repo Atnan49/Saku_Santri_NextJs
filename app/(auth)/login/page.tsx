@@ -56,7 +56,7 @@ export default function LoginPage() {
             <p>Sistem Administrasi Keuangan Beitul Arqom</p>
           </div>
 
-          {error && <p className="login-error">{error}</p>}
+          {error && <p data-testid="login-error-message" className="login-error">{error}</p>}
 
           <form onSubmit={handleSubmit} className="login-form">
             {/* Nomor Induk / ID Pengguna */}
@@ -76,6 +76,7 @@ export default function LoginPage() {
                   required
                   disabled={loading}
                   autoComplete="username"
+                  data-testid="login-username-input"
                 />
               </div>
             </div>
@@ -97,6 +98,7 @@ export default function LoginPage() {
                   required
                   disabled={loading}
                   autoComplete="current-password"
+                  data-testid="login-password-input"
                 />
                 <button
                   type="button"
@@ -111,7 +113,7 @@ export default function LoginPage() {
 
             <hr className="login-divider" />
 
-            <button type="submit" className="login-btn" disabled={loading}>
+            <button type="submit" className="login-btn" disabled={loading} data-testid="login-submit-button">
               {loading ? (
                 <>
                   <Loader2 className="animate-spin" size={18} />

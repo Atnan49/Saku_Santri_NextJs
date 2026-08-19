@@ -174,6 +174,7 @@ export async function getWaliDashboardData() {
           tagihan: {
             include: {
               jenisTagihan: { select: { name: true } },
+              tahunAjaran: { select: { year: true } },
               pembayaran: {
                 orderBy: { createdAt: "desc" },
               },

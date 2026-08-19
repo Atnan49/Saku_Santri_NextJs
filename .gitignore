@@ -44,5 +44,15 @@ next-env.d.ts
 ARTIKEL_ILMIAH_SINTA5.md
 DAFTAR_TUGAS.md
 images/
+# playwright
+/playwright-report/
+/test-results/
 
-
+# temp debug files
+temp_admin_verifikasi.tsx
+check-db.js
+get-limit.js
+get-nisn.js
+test-action.js
+test-wa.ts
+__tests__/debug-*.ts

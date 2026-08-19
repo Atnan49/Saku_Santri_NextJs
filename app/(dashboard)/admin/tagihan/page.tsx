@@ -165,15 +165,26 @@ export default function AdminTagihanPage() {
 
   const handleBuatManual = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!namaTagihan || !nominal) return;
+    console.log("Submit handleBuatManual triggered", { namaTagihan, nominal, targetKelas });
+    if (!namaTagihan || !nominal) {
+      alert(`VALIDATION FAILED: name=${namaTagihan}, nominal=${nominal}`);
+      return;
+    }
     setLoadingManual(true);
     setManualSuccess(false);
 
     try {
       let tId = activeTahun?.id;
       if (!tId) {
-        const tNew = await createTahunAjaran("2025/2026");
-        tId = tNew.id;
+        const tList = await getTahunAjaranList();
+        if (tList.length > 0) {
+          tId = tList[0].id;
+          setActiveTahun(tList[0]);
+        } else {
+          const tNew = await createTahunAjaran("2025/2026");
+          tId = tNew.id;
+          setActiveTahun(tNew);
+        }
       }
 
       const jManual = await createJenisTagihan({
@@ -202,12 +213,14 @@ export default function AdminTagihanPage() {
         catatanTagihan: `Tagihan kegiatan ${namaTagihan.trim()}`,
       });
 
+      console.log("createManualBill res:", res);
       setManualMessage(res.message);
       setManualSuccess(true);
       setNamaTagihan("");
       setNominal("");
       await loadAllBills();
     } catch (err: any) {
+      console.error("handleBuatManual error:", err);
       alert(err.message || "Gagal membuat tagihan manual.");
     } finally {
       setLoadingManual(false);
@@ -329,7 +342,7 @@ export default function AdminTagihanPage() {
               </div>
 
               {sppSuccess && (
-                <div style={{ backgroundColor: "var(--status-lunas-bg)", border: "1px solid var(--status-lunas)", borderRadius: "6px", padding: "0.75rem 1rem", color: "var(--status-lunas)", fontSize: "0.85rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                <div data-testid="tagihan-spp-success-msg" style={{ backgroundColor: "var(--status-lunas-bg)", border: "1px solid var(--status-lunas)", borderRadius: "6px", padding: "0.75rem 1rem", color: "var(--status-lunas)", fontSize: "0.85rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
                   <CheckCircle2 size={18} />
                   <span>{sppMessage || "Berhasil menerbitkan tagihan SPP bulanan untuk seluruh santri!"}</span>
                 </div>
@@ -344,6 +357,7 @@ export default function AdminTagihanPage() {
                     value={bulan}
                     onChange={(e) => setBulan(e.target.value)}
                     style={{ width: "100%", padding: "0.65rem 0.85rem", border: "1px solid var(--border-glass)", borderRadius: "6px", backgroundColor: "var(--bg-app)", fontSize: "0.88rem", marginTop: "0.2rem" }}
+                    data-testid="tagihan-spp-bulan-input"
                   />
                 </div>
 
@@ -368,6 +382,7 @@ export default function AdminTagihanPage() {
                     justifyContent: "center",
                     gap: "0.5rem",
                   }}
+                  data-testid="tagihan-spp-submit-btn"
                 >
                   {loadingSPP ? <Loader2 className="animate-spin" size={18} /> : <Receipt size={18} />}
                   {loadingSPP ? "Memproses..." : "Terbitkan SPP Bulanan"}
@@ -392,7 +407,7 @@ export default function AdminTagihanPage() {
               </div>
 
               {manualSuccess && (
-                <div style={{ backgroundColor: "var(--status-lunas-bg)", border: "1px solid var(--status-lunas)", borderRadius: "6px", padding: "0.75rem 1rem", color: "var(--status-lunas)", fontSize: "0.85rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                <div data-testid="tagihan-manual-success-msg" style={{ backgroundColor: "var(--status-lunas-bg)", border: "1px solid var(--status-lunas)", borderRadius: "6px", padding: "0.75rem 1rem", color: "var(--status-lunas)", fontSize: "0.85rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
                   <CheckCircle2 size={18} />
                   <span>{manualMessage || "Berhasil menerbitkan tagihan manual baru!"}</span>
                 </div>
@@ -403,11 +418,11 @@ export default function AdminTagihanPage() {
                   <label style={{ fontSize: "0.75rem", fontWeight: 800, textTransform: "uppercase", color: "var(--text-muted)" }}>Nama Tagihan / Kegiatan</label>
                   <input
                     type="text"
-                    required
                     placeholder="Contoh: Uang Gedung Cicilan 1 / Buku Modul 2026"
                     value={namaTagihan}
                     onChange={(e) => setNamaTagihan(e.target.value)}
                     style={{ width: "100%", padding: "0.65rem 0.85rem", border: "1px solid var(--border-glass)", borderRadius: "6px", backgroundColor: "var(--bg-app)", fontSize: "0.88rem", marginTop: "0.2rem" }}
+                    data-testid="tagihan-manual-name-input"
                   />
                 </div>
 
@@ -415,12 +430,12 @@ export default function AdminTagihanPage() {
                   <div>
                     <label style={{ fontSize: "0.75rem", fontWeight: 800, textTransform: "uppercase", color: "var(--text-muted)" }}>Nominal (Rp)</label>
                     <input
-                      type="number"
-                      required
+                      type="text"
                       placeholder="Contoh: 500000"
                       value={nominal}
                       onChange={(e) => setNominal(e.target.value)}
                       style={{ width: "100%", padding: "0.65rem 0.85rem", border: "1px solid var(--border-glass)", borderRadius: "6px", backgroundColor: "var(--bg-app)", fontSize: "0.88rem", marginTop: "0.2rem" }}
+                      data-testid="tagihan-manual-nominal-input"
                     />
                   </div>
 
@@ -430,6 +445,7 @@ export default function AdminTagihanPage() {
                       value={targetKelas}
                       onChange={(e) => setTargetKelas(e.target.value)}
                       style={{ width: "100%", padding: "0.65rem 0.85rem", border: "1px solid var(--border-glass)", borderRadius: "6px", backgroundColor: "var(--bg-app)", fontSize: "0.88rem", marginTop: "0.2rem" }}
+                      data-testid="tagihan-manual-target-select"
                     >
                       <option value="SEMUA">Seluruh Santri</option>
                       {kelasList.map((k) => (
@@ -458,6 +474,7 @@ export default function AdminTagihanPage() {
                     justifyContent: "center",
                     gap: "0.5rem",
                   }}
+                  data-testid="tagihan-manual-submit-btn"
                 >
                   {loadingManual ? <Loader2 className="animate-spin" size={18} /> : <PlusCircle size={18} />}
                   {loadingManual ? "Memproses..." : "Terbitkan Tagihan Manual"}

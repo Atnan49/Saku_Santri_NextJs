@@ -43,19 +43,25 @@ export default function KoperasiDashboardPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!nisn.trim() || !totalBelanja) return;
+    if (!nisn.trim() || !totalBelanja) {
+      alert(`VALIDATION FAILED: nisn=${nisn}, totalBelanja=${totalBelanja}`);
+      return;
+    }
 
     setLoading(true);
     setResultAlert(null);
 
     try {
+      console.log("Submitting transaction...");
       const res = await processTransaksiKoperasi({
         nisn: nisn.trim(),
         totalBelanja: Number(totalBelanja),
         catatanBarang: catatanBarang.trim() || undefined,
       });
+      console.log("Response received:", res);
 
       if (res.success) {
+        console.log("Success block reached");
         setResultAlert({
           type: "success",
           message: res.message,
@@ -65,18 +71,22 @@ export default function KoperasiDashboardPage() {
         setNisn("");
         setTotalBelanja("");
         setCatatanBarang("");
+        console.log("State updated for success");
       } else {
+        console.log("Error block reached, message:", res.message);
         setResultAlert({
           type: "error",
           message: res.message || "Gagal memproses transaksi.",
         });
       }
     } catch (err: any) {
+      console.error("Catch block reached:", err);
       setResultAlert({
         type: "error",
         message: err.message || "Gagal memproses transaksi.",
       });
     } finally {
+      console.log("Finally block reached");
       setLoading(false);
     }
   };
@@ -136,6 +146,8 @@ export default function KoperasiDashboardPage() {
 
               {resultAlert && (
                 <div
+                  data-testid="koperasi-alert"
+                  id={resultAlert.type === "success" ? "success-alert" : "error-alert"}
                   style={{
                     backgroundColor: resultAlert.type === "success" ? "var(--status-lunas-bg)" : "var(--status-ditolak-bg)",
                     border: `1px solid ${resultAlert.type === "success" ? "var(--status-lunas)" : "var(--status-ditolak)"}`,
@@ -170,7 +182,7 @@ export default function KoperasiDashboardPage() {
                     <User size={18} style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)" }} />
                     <input
                       type="text"
-                      required
+                      data-testid="input-nisn"
                       placeholder="Masukkan NISN (contoh: 0012345678)"
                       value={nisn}
                       onChange={(e) => setNisn(e.target.value)}
@@ -193,8 +205,7 @@ export default function KoperasiDashboardPage() {
                   </label>
                   <input
                     type="number"
-                    required
-                    min="1000"
+                    data-testid="input-total-belanja"
                     placeholder="15000"
                     value={totalBelanja}
                     onChange={(e) => setTotalBelanja(e.target.value)}
@@ -240,6 +251,7 @@ export default function KoperasiDashboardPage() {
                   </label>
                   <input
                     type="text"
+                    data-testid="input-catatan-barang"
                     placeholder="Contoh: Roti, Kitab, Alat Tulis"
                     value={catatanBarang}
                     onChange={(e) => setCatatanBarang(e.target.value)}
@@ -257,6 +269,7 @@ export default function KoperasiDashboardPage() {
 
                 <button
                   type="submit"
+                  data-testid="submit-koperasi"
                   disabled={loading}
                   style={{
                     padding: "0.85rem",

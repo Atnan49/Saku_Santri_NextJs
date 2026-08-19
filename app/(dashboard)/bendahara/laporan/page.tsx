@@ -119,6 +119,7 @@ export default function BendaharaLaporanPage() {
 
                 <button
                   onClick={handleDownloadExcel}
+                  data-testid="btn-download-excel"
                   disabled={downloading}
                   style={{
                     padding: "0.75rem 1.25rem",
@@ -162,6 +163,7 @@ export default function BendaharaLaporanPage() {
                   <label style={{ fontSize: "0.75rem", fontWeight: 800, textTransform: "uppercase", color: "var(--text-muted)" }}>Cari No. Kwitansi / Nama Santri</label>
                   <input
                     type="text"
+                    data-testid="input-search-kwitansi"
                     placeholder="Contoh: KW-231024 atau nama santri..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
@@ -171,6 +173,7 @@ export default function BendaharaLaporanPage() {
 
                 <button
                   type="submit"
+                  data-testid="btn-search-kwitansi"
                   disabled={searching}
                   style={{
                     padding: "0.75rem 1.25rem",

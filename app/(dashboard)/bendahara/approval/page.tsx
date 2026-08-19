@@ -127,6 +127,7 @@ export default function BendaharaApprovalPage() {
             {selectedIds.length > 0 && (
               <button
                 onClick={handleBulkApprove}
+                data-testid="bulk-approve-button"
                 disabled={isBulkApproving}
                 style={{
                   padding: "0.65rem 1.25rem",
@@ -165,6 +166,7 @@ export default function BendaharaApprovalPage() {
                   <th style={{ padding: "0.85rem 1rem", width: "40px", textAlign: "center" }}>
                     <input
                       type="checkbox"
+                      data-testid="select-all-approval"
                       checked={approvalList.length > 0 && selectedIds.length === approvalList.length}
                       onChange={handleToggleSelectAll}
                       style={{ cursor: "pointer", accentColor: "var(--primary)" }}
@@ -186,6 +188,7 @@ export default function BendaharaApprovalPage() {
                         <td style={{ padding: "0.9rem 1rem", textAlign: "center" }}>
                           <input
                             type="checkbox"
+                            data-testid={`select-approval-${item.tagihan?.siswa?.name?.toLowerCase().replace(/\s+/g, '-') || item.id}`}
                             checked={isChecked}
                             onChange={() => handleToggleSelectOne(item.id)}
                             style={{ cursor: "pointer", accentColor: "var(--primary)" }}
@@ -201,6 +204,7 @@ export default function BendaharaApprovalPage() {
                         <td style={{ padding: "0.9rem 1rem", textAlign: "center" }}>
                           <button
                             onClick={() => handleApprove(item)}
+                            data-testid={`approve-button-${item.tagihan?.siswa?.name?.toLowerCase().replace(/\s+/g, '-') || item.id}`}
                             style={{
                               padding: "0.4rem 0.85rem",
                               fontSize: "0.78rem",

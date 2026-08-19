@@ -20,6 +20,7 @@ async function main() {
   const delTransaksiKoperasi = await prisma.transaksiKoperasi.deleteMany({});
   const delTagihan = await prisma.tagihan.deleteMany({});
   const delNotif = await prisma.notification.deleteMany({});
+  const delJenisTagihan = await prisma.jenisTagihan.deleteMany({});
 
   console.log(`- Terhapus ${delPembayaran.count} data pembayaran`);
   console.log(`- Terhapus ${delTopup.count} data topup saku`);
@@ -27,13 +28,13 @@ async function main() {
   console.log(`- Terhapus ${delTagihan.count} data tagihan`);
   console.log(`- Terhapus ${delNotif.count} notifikasi`);
 
-  // 2. Reset saldo saku seluruh siswa ke 0
+  // 2. Reset saldo saku seluruh siswa ke modal awal untuk E2E test
   await prisma.siswa.updateMany({
     data: {
-      saldoSaku: 0,
+      saldoSaku: 100000,
     },
   });
-  console.log("- Saldo saku seluruh santri berhasil di-reset ke Rp 0");
+  console.log("- Saldo saku seluruh santri berhasil di-reset ke Rp 100.000");
 
   // 3. Pastikan Akun Inti (Admin & Bendahara) Selalu Tersedia
   const adminPassword = await bcrypt.hash("admin123", 10);

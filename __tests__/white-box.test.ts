@@ -105,6 +105,33 @@ describe('Pengujian WHITE BOX (Validasi Logika Internal & Struktur Kode)', () =>
 
   describe('Unit 2: API Verifikasi Pembayaran (Database State Transition)', () => {
     
+    it('Path 1: User tidak terautentikasi -> Akses ditolak (401)', async () => {
+      (getServerSession as any).mockResolvedValue(null);
+      const req = new NextRequest('http://localhost/api/pembayaran', {
+        method: 'PUT', body: JSON.stringify({ pembayaranId: '1', action: 'approve' }),
+      });
+      const res = await putPembayaran(req);
+      expect(res.status).toBe(401);
+    });
+
+    it('Path 2: Validasi payload request gagal -> Bad Request (400)', async () => {
+      (getServerSession as any).mockResolvedValue({ user: { id: 'admin1', role: 'ADMIN' } });
+      const req = new NextRequest('http://localhost/api/pembayaran', {
+        method: 'PUT', body: JSON.stringify({ action: 'approve' }),
+      });
+      const res = await putPembayaran(req);
+      expect(res.status).toBe(400);
+    });
+
+    it('Path 5: Role user bukan ADMIN/BENDAHARA -> Akses di tolak (403)', async () => {
+      (getServerSession as any).mockResolvedValue({ user: { id: 'wali1', role: 'WALIMURID' } });
+      const req = new NextRequest('http://localhost/api/pembayaran', {
+        method: 'PUT', body: JSON.stringify({ pembayaranId: '1', action: 'approve' }),
+      });
+      const res = await putPembayaran(req);
+      expect(res.status).toBe(403);
+    });
+
     it('Path 3: Role ADMIN memverifikasi -> prisma.pembayaran.update dipanggil', async () => {
       (getServerSession as any).mockResolvedValue({ user: { id: 'admin1', role: 'ADMIN' } });
       (prisma.pembayaran.findUnique as any).mockResolvedValue({
@@ -154,6 +181,24 @@ describe('Pengujian WHITE BOX (Validasi Logika Internal & Struktur Kode)', () =>
   });
 
   describe('Unit 3: Modul Transaksi Koperasi (Database State Transition)', () => {
+
+    it('Path 1: User tidak terautentikasi / role invalid -> Akses ditolak (403)', async () => {
+      (getServerSession as any).mockResolvedValue(null);
+      const req = new NextRequest('http://localhost/api/saku/transaksi', {
+        method: 'POST', body: JSON.stringify({ nisn: '123', totalBelanja: 10000 }),
+      });
+      const res = await postTransaksi(req);
+      expect(res.status).toBe(403);
+    });
+
+    it('Path 2: Validasi payload request gagal -> Bad Request (400)', async () => {
+      (getServerSession as any).mockResolvedValue({ user: { id: 'kasir1', role: 'KOPERASI' } });
+      const req = new NextRequest('http://localhost/api/saku/transaksi', {
+        method: 'POST', body: JSON.stringify({ totalBelanja: 10000 }),
+      });
+      const res = await postTransaksi(req);
+      expect(res.status).toBe(400);
+    });
 
     it('Path 3: Nominal melebihi saldo -> Eksekusi rollback secara logika program', async () => {
       (getServerSession as any).mockResolvedValue({ user: { id: 'kasir1', role: 'KOPERASI' } });
