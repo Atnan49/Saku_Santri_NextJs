@@ -57,97 +57,100 @@ describe('Pengujian WHITE BOX (Validasi Logika Internal & Struktur Kode)', () =>
     vi.clearAllMocks();
   });
 
-  describe('Unit 1: Middleware RBAC (Pengujian Cabang Logika Akses)', () => {
+  // =========================================================================
+  // Unit 1: Middleware RBAC (middleware.ts)
+  // =========================================================================
+  describe('Unit 1: Middleware RBAC (middleware.ts)', () => {
     const createReq = (path: string, role?: string) => {
       const req = new NextRequest(`http://localhost${path}`);
       (req as any).nextauth = { token: role ? { role } : null };
       return req;
     };
 
-    it('Path 1: URL /admin -> Role != ADMIN -> Eksekusi percabangan redirect', () => {
+    it('Path 1: URL /admin -> Role != ADMIN -> Redirect Login (401)', () => {
       const res = (middleware as any)(createReq('/admin/dashboard', 'WALIMURID'));
-      expect(res.status).toBe(307); 
+      expect(res.status).toBe(307);
       expect(res.headers.get('location')).toContain('error=UnauthorizedAdmin');
     });
 
-    it('Path 2: URL /admin -> Role == ADMIN -> Melanjutkan akses', () => {
+    it('Path 2: URL /admin -> Role == ADMIN -> Melanjutkan akses (Lolos)', () => {
       const res = (middleware as any)(createReq('/admin/dashboard', 'ADMIN'));
-      expect(res).toBeUndefined(); // Memastikan middleware melanjutkan next()
+      expect(res).toBeUndefined();
     });
 
-    it('Path 3: URL /bendahara -> Role invalid -> Eksekusi percabangan redirect', () => {
+    it('Path 3: URL /bendahara -> Role invalid -> Redirect Login (401)', () => {
       const res = (middleware as any)(createReq('/bendahara/laporan', 'KOPERASI'));
       expect(res.status).toBe(307);
       expect(res.headers.get('location')).toContain('error=UnauthorizedBendahara');
     });
 
-    it('Path 4: URL /bendahara -> Role valid -> Melanjutkan akses', () => {
+    it('Path 4: URL /bendahara -> Role valid -> Melanjutkan akses (Lolos)', () => {
       const res = (middleware as any)(createReq('/bendahara/laporan', 'BENDAHARA'));
       expect(res).toBeUndefined();
     });
 
-    it('Path 5: URL /wali -> Role != WALIMURID -> Eksekusi percabangan redirect', () => {
+    it('Path 5: URL /wali -> Role != WALIMURID -> Redirect Login (401)', () => {
       const res = (middleware as any)(createReq('/wali/dashboard', 'ADMIN'));
       expect(res.status).toBe(307);
       expect(res.headers.get('location')).toContain('error=UnauthorizedWali');
     });
 
-    it('Path 6: URL /wali -> Role == WALIMURID -> Melanjutkan akses', () => {
+    it('Path 6: URL /wali -> Role == WALIMURID -> Melanjutkan akses (Lolos)', () => {
       const res = (middleware as any)(createReq('/wali/dashboard', 'WALIMURID'));
       expect(res).toBeUndefined();
     });
 
-    it('Path 7: Rute URL lolos pengecekan proteksi -> Melanjutkan akses', () => {
+    it('Path 7: Rute URL lolos pengecekan proteksi -> Melanjutkan akses (Lolos)', () => {
       const res = (middleware as any)(createReq('/public/info', 'GUEST'));
       expect(res).toBeUndefined();
     });
   });
 
-  describe('Unit 2: API Verifikasi Pembayaran (Database State Transition)', () => {
+  // =========================================================================
+  // Unit 2: API Verifikasi Pembayaran (api/pembayaran/route.ts)
+  // =========================================================================
+  describe('Unit 2: API Verifikasi Pembayaran (api/pembayaran/route.ts)', () => {
     
-    it('Path 1: User tidak terautentikasi -> Akses ditolak (401)', async () => {
+    it('Path 1: User tidak terautentikasi (Sesi kosong) -> Akses ditolak (401)', async () => {
       (getServerSession as any).mockResolvedValue(null);
       const req = new NextRequest('http://localhost/api/pembayaran', {
-        method: 'PUT', body: JSON.stringify({ pembayaranId: '1', action: 'approve' }),
+        method: 'PUT',
+        body: JSON.stringify({ pembayaranId: '1', action: 'approve' }),
       });
       const res = await putPembayaran(req);
       expect(res.status).toBe(401);
     });
 
-    it('Path 2: Validasi payload request gagal -> Bad Request (400)', async () => {
+    it('Path 2: Validasi payload request gagal (ID/Action kosong atau salah) -> Bad Request (400)', async () => {
       (getServerSession as any).mockResolvedValue({ user: { id: 'admin1', role: 'ADMIN' } });
       const req = new NextRequest('http://localhost/api/pembayaran', {
-        method: 'PUT', body: JSON.stringify({ action: 'approve' }),
+        method: 'PUT',
+        body: JSON.stringify({ action: 'approve' }),
       });
       const res = await putPembayaran(req);
       expect(res.status).toBe(400);
     });
 
-    it('Path 5: Role user bukan ADMIN/BENDAHARA -> Akses di tolak (403)', async () => {
-      (getServerSession as any).mockResolvedValue({ user: { id: 'wali1', role: 'WALIMURID' } });
-      const req = new NextRequest('http://localhost/api/pembayaran', {
-        method: 'PUT', body: JSON.stringify({ pembayaranId: '1', action: 'approve' }),
-      });
-      const res = await putPembayaran(req);
-      expect(res.status).toBe(403);
-    });
-
-    it('Path 3: Role ADMIN memverifikasi -> prisma.pembayaran.update dipanggil', async () => {
+    it('Path 3: Role user adalah ADMIN -> Eksekusi adminVerifyPayment (Tahap 1)', async () => {
       (getServerSession as any).mockResolvedValue({ user: { id: 'admin1', role: 'ADMIN' } });
       (prisma.pembayaran.findUnique as any).mockResolvedValue({
-        id: '1', tagihanId: 't1', nominalDisetor: 50000, buktiUrl: '/bukti.jpg',
+        id: '1',
+        tagihanId: 't1',
+        nominalDisetor: 50000,
+        buktiUrl: '/bukti.jpg',
         tagihan: {
-          status: 'MENUNGGU_VERIFIKASI_ADMIN', jenisTagihan: { name: 'SPP' },
+          status: 'MENUNGGU_VERIFIKASI_ADMIN',
+          jenisTagihan: { name: 'SPP' },
           siswa: { name: 'S1', wali: { user: { phone: '08' } }, kelas: { name: 'X' } }
         }
       });
       
       const req = new NextRequest('http://localhost/api/pembayaran', {
-        method: 'PUT', body: JSON.stringify({ pembayaranId: '1', action: 'approve' }),
+        method: 'PUT',
+        body: JSON.stringify({ pembayaranId: '1', action: 'approve' }),
       });
       await putPembayaran(req);
       
-      // White Box: Mengecek apakah internal state diubah dengan benar
       expect(prisma.tagihan.update).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({ status: 'MENUNGGU_APPROVAL_BENDAHARA' })
@@ -155,83 +158,124 @@ describe('Pengujian WHITE BOX (Validasi Logika Internal & Struktur Kode)', () =>
       );
     });
 
-    it('Path 4: Role BENDAHARA approval final -> prisma.tagihan.update dipanggil (LUNAS)', async () => {
+    it('Path 4: Role user adalah BENDAHARA -> Eksekusi bendaharaApprovePayment (Tahap 2)', async () => {
       (getServerSession as any).mockResolvedValue({ user: { id: 'ben1', role: 'BENDAHARA' } });
       (prisma.pembayaran.findUnique as any).mockResolvedValue({
-        id: '1', tagihanId: 't1', nominalDisetor: 500000, buktiUrl: '/bukti.jpg',
+        id: '1',
+        tagihanId: 't1',
+        nominalDisetor: 500000,
+        buktiUrl: '/bukti.jpg',
         tagihan: {
-          id: 't1', status: 'MENUNGGU_APPROVAL_BENDAHARA', nominalAkhir: 500000, nominalTerbayar: 0,
+          id: 't1',
+          status: 'MENUNGGU_APPROVAL_BENDAHARA',
+          nominalAkhir: 500000,
+          nominalTerbayar: 0,
           jenisTagihan: { name: 'SPP' },
           siswa: { name: 'S1', wali: { user: { phone: '08' } }, kelas: { name: 'X' } }
         }
       });
 
       const req = new NextRequest('http://localhost/api/pembayaran', {
-        method: 'PUT', body: JSON.stringify({ pembayaranId: '1', action: 'approve' }),
+        method: 'PUT',
+        body: JSON.stringify({ pembayaranId: '1', action: 'approve' }),
       });
       await putPembayaran(req);
       
-      // White Box: Mengecek apakah tagihan benar-benar dilunaskan di database
       expect(prisma.tagihan.update).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({ status: 'LUNAS' })
         })
       );
     });
-  });
 
-  describe('Unit 3: Modul Transaksi Koperasi (Database State Transition)', () => {
-
-    it('Path 1: User tidak terautentikasi / role invalid -> Akses ditolak (403)', async () => {
-      (getServerSession as any).mockResolvedValue(null);
-      const req = new NextRequest('http://localhost/api/saku/transaksi', {
-        method: 'POST', body: JSON.stringify({ nisn: '123', totalBelanja: 10000 }),
+    it('Path 5: Role user bukan ADMIN/BENDAHARA (contoh: WALI mencoba PUT) -> Akses ditolak (403)', async () => {
+      (getServerSession as any).mockResolvedValue({ user: { id: 'wali1', role: 'WALIMURID' } });
+      const req = new NextRequest('http://localhost/api/pembayaran', {
+        method: 'PUT',
+        body: JSON.stringify({ pembayaranId: '1', action: 'approve' }),
       });
-      const res = await postTransaksi(req);
+      const res = await putPembayaran(req);
       expect(res.status).toBe(403);
     });
+  });
 
-    it('Path 2: Validasi payload request gagal -> Bad Request (400)', async () => {
+  // =========================================================================
+  // Unit 3: Modul Transaksi Saldo Koperasi (API Transaksi)
+  // =========================================================================
+  describe('Unit 3: Modul Transaksi Saldo Koperasi (API Transaksi)', () => {
+
+    it('Path 1: Kasir validasi form gagal / nominal belanja tidak dimasukkan -> (400 Error)', async () => {
       (getServerSession as any).mockResolvedValue({ user: { id: 'kasir1', role: 'KOPERASI' } });
       const req = new NextRequest('http://localhost/api/saku/transaksi', {
-        method: 'POST', body: JSON.stringify({ totalBelanja: 10000 }),
+        method: 'POST',
+        body: JSON.stringify({ nisn: '123' }), // nominal belanja tidak dimasukkan
       });
       const res = await postTransaksi(req);
       expect(res.status).toBe(400);
     });
 
-    it('Path 3: Nominal melebihi saldo -> Eksekusi rollback secara logika program', async () => {
+    it('Path 2: ID Siswa tidak ditemukan di database saat pencarian -> (404 Not Found)', async () => {
+      (getServerSession as any).mockResolvedValue({ user: { id: 'kasir1', role: 'KOPERASI' } });
+      (prisma.siswa.findUnique as any).mockResolvedValue(null);
+
+      const req = new NextRequest('http://localhost/api/saku/transaksi', {
+        method: 'POST',
+        body: JSON.stringify({ nisn: '999999', totalBelanja: 10000 }),
+      });
+      const res = await postTransaksi(req);
+      const json = await res.json();
+      expect(json.success).toBe(false);
+      expect(json.message).toContain('tidak ditemukan');
+    });
+
+    it('Path 3: Nominal transaksi melebihi saldo saku saat ini -> Rollback transaksi -> Insufficient Funds', async () => {
       (getServerSession as any).mockResolvedValue({ user: { id: 'kasir1', role: 'KOPERASI' } });
       (prisma.siswa.findUnique as any).mockResolvedValue({
-        id: 's1', nisn: '123', name: 'Siswa1', saldoSaku: 5000, limitHarian: 50000,
-        wali: { user: { phone: '08' } }, kelas: { name: 'X' }
+        id: 's1',
+        nisn: '123',
+        name: 'Siswa1',
+        saldoSaku: 5000,
+        limitHarian: 50000,
+        wali: { user: { phone: '08' } },
+        kelas: { name: 'X' }
       });
 
       const req = new NextRequest('http://localhost/api/saku/transaksi', {
-        method: 'POST', body: JSON.stringify({ nisn: '123', totalBelanja: 10000 }),
+        method: 'POST',
+        body: JSON.stringify({ nisn: '123', totalBelanja: 10000 }),
       });
-      await postTransaksi(req);
+      const res = await postTransaksi(req);
+      const json = await res.json();
+      expect(json.success).toBe(false);
+      expect(json.message).toContain('tidak mencukupi');
       
-      // White Box: Pastikan tidak ada aksi update saldo jika logic mendeteksi insufficient funds
+      // Rollback validation: pastikan saldo tidak dipotong
       expect(prisma.siswa.update).not.toHaveBeenCalled();
     });
 
-    it('Path 4: Saldo mencukupi -> prisma.siswa.update dipanggil secara atomik', async () => {
+    it('Path 4: Saldo mencukupi -> Saldo dipotong & Log Mutasi tercatat secara atomik -> Berhasil (200)', async () => {
       (getServerSession as any).mockResolvedValue({ user: { id: 'kasir1', role: 'KOPERASI' } });
       (prisma.siswa.findUnique as any).mockResolvedValue({
-        id: 's1', nisn: '123', name: 'Siswa1', saldoSaku: 50000, limitHarian: 50000,
-        wali: { user: { phone: '08' } }, kelas: { name: 'X' }
+        id: 's1',
+        nisn: '123',
+        name: 'Siswa1',
+        saldoSaku: 50000,
+        limitHarian: 50000,
+        wali: { user: { phone: '08' } },
+        kelas: { name: 'X' }
       });
       (prisma.transaksiKoperasi.aggregate as any).mockResolvedValue({ _sum: { totalBelanja: 0 } });
       (prisma.transaksiKoperasi.create as any).mockResolvedValue({ id: 'tx1' });
       (prisma.siswa.update as any).mockResolvedValue({ saldoSaku: 40000 });
 
       const req = new NextRequest('http://localhost/api/saku/transaksi', {
-        method: 'POST', body: JSON.stringify({ nisn: '123', totalBelanja: 10000 }),
+        method: 'POST',
+        body: JSON.stringify({ nisn: '123', totalBelanja: 10000 }),
       });
-      await postTransaksi(req);
+      const res = await postTransaksi(req);
+      const json = await res.json();
       
-      // White Box: Mengecek pemanggilan fungsi update database siswa
+      expect(json.success).toBe(true);
       expect(prisma.siswa.update).toHaveBeenCalled();
     });
   });
