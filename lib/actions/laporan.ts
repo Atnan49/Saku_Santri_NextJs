@@ -176,6 +176,9 @@ export async function getWaliDashboardData() {
               jenisTagihan: { select: { name: true } },
               tahunAjaran: { select: { year: true } },
               pembayaran: {
+                include: {
+                  approvedByUser: { select: { name: true } },
+                },
                 orderBy: { createdAt: "desc" },
               },
             },

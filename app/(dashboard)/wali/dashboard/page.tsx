@@ -148,8 +148,27 @@ export default function WaliDashboardPage() {
     }
     loadData();
   }, []);
-
   const receiptsArchive: Array<DigitalReceiptData> = [];
+  const waliNameForReceipt = waliData?.user?.name || "Wali Murid";
+  (waliData?.siswa || []).forEach((student: any) => {
+    (student.tagihan || []).forEach((bill: any) => {
+      (bill.pembayaran || []).forEach((p: any, idx: number) => {
+        if (p.approvedAt || bill.status === "LUNAS") {
+          receiptsArchive.push({
+            receiptNo: `KWT-${p.id ? p.id.slice(0, 8).toUpperCase() : (idx + 1).toString().padStart(4, "0")}`,
+            date: p.approvedAt ? new Date(p.approvedAt).toISOString().split("T")[0] : new Date().toISOString().split("T")[0],
+            receivedFrom: waliNameForReceipt,
+            studentName: student.name,
+            studentClass: student.kelas?.name || "-",
+            amount: Number(p.nominalDisetor || bill.nominalAkhir || 0),
+            paymentFor: bill.jenisTagihan?.name ? `${bill.jenisTagihan.name} (${bill.period || "Tagihan"})` : "Pembayaran SPP",
+            verifiedBy: p.approvedByUser?.name || "Bendahara Utama",
+            paymentMethod: "Transfer Bank",
+          });
+        }
+      });
+    });
+  });
 
   const handleToggleSelect = (id: string) => {
     setSelectedTagihan((prev) =>
